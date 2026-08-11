@@ -36,16 +36,16 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
             </span>
             <div className='min-w-0 flex-1'>
                 <p className='truncate text-sm font-semibold'>{task.title}</p>
-                <p className={cn('text-xs', overdue ? 'text-destructive' : 'text-muted-foreground')}>
+                <p className={cn('truncate text-xs', overdue ? 'text-destructive' : 'text-muted-foreground')}>
                     {relativeDue(task.due)}
-                    {tree ? ` · ${tree.location}` : ''}
+                    {tree ? ` · ${tree.location}` : task.kind === 'photo' ? ` · ${task.detail}` : ''}
                 </p>
             </div>
-            {task.kind === 'photo' && task.treeId ? (
+            {task.kind === 'photo' ? (
                 <Link
-                    href={`/trees/${task.treeId}?progress=1`}
-                    className='bg-secondary text-secondary-foreground rounded-full px-3 py-2 text-xs font-medium'>
-                    Add photo
+                    href={task.treeId ? `/trees/${task.treeId}?progress=1` : '/'}
+                    className='bg-secondary text-secondary-foreground shrink-0 rounded-full px-3 py-2 text-xs font-medium'>
+                    {task.treeId ? 'Add photo' : 'Start'}
                 </Link>
             ) : (
                 <button

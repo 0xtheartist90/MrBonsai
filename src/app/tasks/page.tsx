@@ -12,7 +12,7 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TasksPage = () => {
-    const { ready, tasks, trees, addCustomTask } = useBonsai();
+    const { ready, agenda: tasks, trees, addCustomTask } = useBonsai();
     const [adding, setAdding] = useState(false);
     const [title, setTitle] = useState('');
     const [due, setDue] = useState('');

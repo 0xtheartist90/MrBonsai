@@ -2,7 +2,7 @@
 
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { addDays, currentSeason, startOfDay } from './season';
+import { SEASON_LABEL, addDays, currentSeason, startOfDay } from './season';
 import { speciesById } from './species';
 import type { CareTask, CustomTask, ProgressEntry, Tree } from './types';
 
@@ -172,7 +172,10 @@ interface BonsaiContextValue {
     addProgress: (treeId: string, entry: Omit<ProgressEntry, 'id'>) => void;
     addCustomTask: (task: Omit<CustomTask, 'id' | 'done'>) => void;
     completeTask: (task: CareTask) => void;
+    /** Every task, one per tree — used on a tree's own page */
     tasks: CareTask[];
+    /** Same list for collection-wide views, with the seasonal photo reminders collapsed into one */
+    agenda: CareTask[];
 }
 
 const BonsaiContext = createContext<BonsaiContextValue | null>(null);
@@ -245,6 +248,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
+    const agenda = useMemo(() => collapsePhotoTasks(tasks), [tasks]);
 
     const completeTask: BonsaiContextValue['completeTask'] = useCallback((task) => {
         const nowIso = new Date().toISOString();
@@ -270,7 +274,8 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         addProgress,
         addCustomTask,
         completeTask,
-        tasks
+        tasks,
+        agenda
     };
 
     return <BonsaiContext.Provider value={value}>{children}</BonsaiContext.Provider>;
@@ -380,3 +385,24 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
 };
 
 const daysBetween = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / 86_400_000);
+
+/**
+ * One photo reminder per tree floods the agenda — every tree wants one at the start of a season.
+ * Collection-wide views get a single "photo round" row instead.
+ */
+const collapsePhotoTasks = (tasks: CareTask[]): CareTask[] => {
+    const photos = tasks.filter((t) => t.kind === 'photo');
+    if (photos.length <= 1) return tasks;
+
+    const rest = tasks.filter((t) => t.kind !== 'photo');
+    const season = SEASON_LABEL[currentSeason()];
+    const round: CareTask = {
+        key: 'photo-round',
+        kind: 'photo',
+        title: `${season} photo round`,
+        detail: `${photos.length} plants still need a photo this season.`,
+        due: photos.reduce((earliest, t) => (t.due < earliest ? t.due : earliest), photos[0].due)
+    };
+
+    return [...rest, round].sort((a, b) => a.due.getTime() - b.due.getTime());
+};

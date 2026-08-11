@@ -5,15 +5,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 import { TreePhoto } from '@/components/bonsai/tree-photo';
-import { formatDate } from '@/lib/bonsai/season';
 import { speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
+import { treeUrgency } from '@/lib/bonsai/urgency';
+import { cn } from '@/lib/utils';
 import { Input } from '@/registry/new-york-v4/ui/input';
 
 import { Search, Sprout } from 'lucide-react';
 
 const MyTreesPage = () => {
-    const { ready, trees } = useBonsai();
+    const { ready, trees, tasks } = useBonsai();
     const [query, setQuery] = useState('');
 
     if (!ready) return null;
@@ -75,31 +76,45 @@ const MyTreesPage = () => {
             ) : (
                 <div className='grid grid-cols-2 gap-3'>
                     {filtered.map((tree) => {
-                        const species = speciesById(tree.speciesId);
+                        const urgency = treeUrgency(tasks, tree.id);
+                        const age = tree.birthYear ? new Date().getFullYear() - tree.birthYear : undefined;
 
                         return (
                             <Link
                                 key={tree.id}
                                 href={`/trees/${tree.id}`}
-                                className='bg-card overflow-hidden rounded-3xl shadow-sm transition-transform active:scale-[0.98]'>
-                                <div className='relative h-40'>
-                                    <TreePhoto photo={tree.photo} name={tree.name} />
+                                className='group bg-card relative aspect-[3/4] overflow-hidden rounded-[1.75rem] shadow-sm transition-transform active:scale-[0.97]'>
+                                <TreePhoto photo={tree.photo} name={tree.name} />
+                                <div className='absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/5' />
+
+                                <div className='absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-1'>
+                                    {urgency && (
+                                        <span
+                                            className={cn(
+                                                'truncate rounded-full px-2 py-1 text-[10px] font-semibold shadow-sm backdrop-blur-md',
+                                                urgency.overdue
+                                                    ? 'bg-destructive/90 text-white'
+                                                    : 'bg-white/85 text-foreground'
+                                            )}>
+                                            {urgency.label}
+                                        </span>
+                                    )}
                                     {tree.stage === 'cutting' && (
-                                        <span className='bg-card/90 absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur'>
+                                        <span className='ml-auto shrink-0 rounded-full bg-white/85 px-2 py-1 text-[10px] font-semibold backdrop-blur-md'>
                                             Cutting
                                         </span>
                                     )}
                                 </div>
-                                <div className='p-3'>
-                                    <p className='truncate font-semibold'>{tree.name}</p>
-                                    <p className='text-muted-foreground truncate text-xs'>{species?.name}</p>
-                                    <p className='text-muted-foreground mt-1 text-xs'>
-                                        {tree.birthYear
-                                            ? new Date().getFullYear() - tree.birthYear < 1
-                                                ? '< 1 yr old'
-                                                : `±${new Date().getFullYear() - tree.birthYear} yrs old`
-                                            : `Since ${formatDate(tree.acquiredAt)}`}
+
+                                <div className='absolute inset-x-3 bottom-3 text-white'>
+                                    <p className='line-clamp-2 text-[15px] leading-tight font-bold drop-shadow-sm'>
+                                        {tree.name}
                                     </p>
+                                    {age !== undefined && (
+                                        <span className='mt-1.5 inline-block rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap backdrop-blur-sm'>
+                                            {age < 1 ? '< 1 yr' : `±${age} yrs`}
+                                        </span>
+                                    )}
                                 </div>
                             </Link>
                         );

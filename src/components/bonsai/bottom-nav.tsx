@@ -22,8 +22,8 @@ const isActive = (href: string, pathname: string): boolean =>
 
 export const BottomNav = () => {
     const pathname = usePathname();
-    const { tasks } = useBonsai();
-    const dueCount = tasks.filter((t) => daysBetween(new Date(), t.due) <= 0).length;
+    const { agenda } = useBonsai();
+    const dueCount = agenda.filter((t) => daysBetween(new Date(), t.due) <= 0).length;
 
     const left = items.slice(0, 2);
     const right = items.slice(2);
