@@ -9,7 +9,9 @@ const withBundleAnalyzer = initializeBundleAnalyzer({
 
 // https://nextjs.org/docs/pages/api-reference/next-config-js
 const nextConfig: NextConfig = {
-    output: 'standalone'
+    output: 'standalone',
+    // Builds write to their own directory so `npm run build` never clobbers a running dev server
+    distDir: process.env.BUILD_DIR || '.next'
 };
 
 export default withBundleAnalyzer(nextConfig);

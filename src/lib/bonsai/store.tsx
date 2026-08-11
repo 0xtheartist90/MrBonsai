@@ -1,0 +1,382 @@
+'use client';
+
+import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
+import { addDays, currentSeason, startOfDay } from './season';
+import { speciesById } from './species';
+import type { CareTask, CustomTask, ProgressEntry, Tree } from './types';
+
+const STORAGE_KEY = 'mr-bonsai-v3';
+
+interface PersistedState {
+    trees: Tree[];
+    customTasks: CustomTask[];
+}
+
+const uid = (): string => Math.random().toString(36).slice(2, 10);
+
+const seedTrees = (): Tree[] => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const iso = (daysAgo: number) => addDays(now, -daysAgo).toISOString();
+
+    const tree = (t: Omit<Tree, 'id' | 'progress' | 'notes'> & { notes?: string }): Tree => ({
+        id: uid(),
+        progress: [],
+        notes: '',
+        lastWatered: iso(1),
+        lastFertilized: iso(10),
+        lastRepotted: t.acquiredAt,
+        ...t
+    });
+
+    return [
+        tree({
+            name: 'Golden Spoon Ficus 1 yr',
+            speciesId: 'ficus-annulata',
+            acquiredAt: iso(200),
+            location: 'Outside',
+            photo: '/images/trees/gs-ficus-1yr.jpg',
+            birthYear: year - 1,
+            purchasePrice: 39,
+            purchasedAt: 'Treehouse Garden (Shopee)',
+            stage: 'development',
+            notes: 'Priority: roots, trunk thickening, trunk movement, future branch positions. Avoid too many short pruning rounds while thickening the trunk.'
+        }),
+        tree({
+            name: 'Golden Spoon Ficus 2 yr',
+            speciesId: 'ficus-annulata',
+            acquiredAt: iso(200),
+            location: 'Outside',
+            photo: '/images/trees/gs-ficus-2yr.jpg',
+            birthYear: year - 2,
+            purchasePrice: 135,
+            purchasedAt: 'Treehouse Garden (Shopee)',
+            stage: 'development',
+            notes: 'Start choosing a front, main leader and primary branches; remove competing leaders. If the trunk is still thin: grow first, refine later.'
+        }),
+        tree({
+            name: 'Fukien Tea',
+            speciesId: 'carmona',
+            acquiredAt: iso(200),
+            location: 'Outside',
+            photo: '/images/trees/fukien-tea.jpg',
+            birthYear: year - 2,
+            purchasePrice: 120,
+            purchasedAt: 'Family Garden (Shopee)',
+            stage: 'development',
+            notes: 'Fix trunk structure, choose primary branches, run sacrifice branches for thickness. Not yet into super-fine ramification. Leaf drop ≠ automatically more water: check the soil first.'
+        }),
+        tree({
+            name: 'Fukien Tea small',
+            speciesId: 'carmona',
+            acquiredAt: iso(200),
+            location: 'Outside',
+            photo: '/images/trees/fukien-tea-small.jpg',
+            birthYear: year - 1,
+            purchasePrice: 120,
+            purchasedAt: 'Treehouse Garden (Shopee)',
+            stage: 'development',
+            notes: 'Growth first: strong roots, fast healthy growth, trunk thickening. Do not clip every new shoot, no heavy defoliation, no tiny show pot yet.'
+        }),
+        tree({
+            name: 'Creeping Juniper',
+            speciesId: 'creeping-juniper',
+            acquiredAt: iso(200),
+            location: 'Outside — full sun, max airflow',
+            photo: '/images/trees/creeping-juniper.jpg',
+            birthYear: year - 1,
+            purchasePrice: 120,
+            purchasedAt: 'Treehouse Garden (Shopee)',
+            stage: 'development',
+            notes: 'Temperate species in a tropical climate — the collection\'s watchlist plant. Always outside, extreme drainage, never constantly wet. Health and vigor before any deadwood work.'
+        }),
+        tree({
+            name: 'Wood Apple (Ma-sang)',
+            speciesId: 'wood-apple',
+            acquiredAt: iso(200),
+            location: 'Outside',
+            photo: '/images/trees/wood-apple.jpg',
+            birthYear: year - 2,
+            purchasePrice: 160,
+            purchasedAt: 'Family Garden (Shopee)',
+            stage: 'development',
+            notes: 'Feroniella lucida (มะสัง). Priority: root system, nebari, trunk thickness, taper, primary branches. Don\'t keep it compact too early — power trunk first.'
+        }),
+        tree({
+            name: 'Dwarf Jade',
+            speciesId: 'jade',
+            acquiredAt: iso(200),
+            location: 'Outside — sheltered from long rain',
+            photo: '/images/trees/dwarf-jade.jpg',
+            birthYear: year - 3,
+            purchasePrice: 650,
+            purchasedAt: 'Facebook',
+            stage: 'refinement',
+            notes: 'Driest plant of the collection: almost fully dry before watering — overwatering is far more dangerous than slightly too dry. If trunk is thick enough: choose front, finalize primaries, build taper.'
+        }),
+        tree({
+            name: 'Vietnamese Blue Bell',
+            speciesId: 'blue-bell',
+            acquiredAt: iso(200),
+            location: 'Outside — full sun',
+            photo: '/images/trees/blue-bell.jpg',
+            birthYear: year - 3,
+            purchasePrice: 500,
+            purchasedAt: 'Plant market',
+            stage: 'refinement',
+            notes: 'Linh Sam. If trunk is thick enough: finalize primary structure, refine branching, build the flowering crown. Otherwise let some branches run longer.'
+        }),
+        tree({
+            name: 'Tamarind cuttings',
+            speciesId: 'tamarind',
+            acquiredAt: iso(10),
+            location: 'Propagation corner — bright, no midday sun',
+            photo: '/images/trees/cuttings-tamarind.jpg',
+            birthYear: year,
+            purchasedAt: 'Own propagation',
+            stage: 'cutting',
+            notes: 'Rooting phase: evenly lightly moist, high humidity WITH airflow, warm. No fertilizer until sustained new growth. Don\'t pull them out to check — look for roots at the drainage holes.'
+        }),
+        tree({
+            name: 'Dwarf Jade cuttings',
+            speciesId: 'jade',
+            acquiredAt: iso(10),
+            location: 'Propagation corner — bright, airy',
+            birthYear: year,
+            purchasedAt: 'Own propagation',
+            stage: 'cutting',
+            notes: 'Treat much drier than the other cuttings: let cut callus, very airy mix, dry to barely moist — NO wet humidity dome. Water more only after callus and first roots.'
+        }),
+        tree({
+            name: 'Blue Bell cuttings',
+            speciesId: 'blue-bell',
+            acquiredAt: iso(10),
+            location: 'Propagation corner — bright, humid',
+            photo: '/images/trees/cuttings-blue-bell.jpg',
+            birthYear: year,
+            purchasedAt: 'Own propagation',
+            stage: 'cutting',
+            notes: 'Rooting phase: constantly lightly moist, never soggy, high humidity with daily fresh air against mold. Leave the first flush of growth alone — roots and reserves before any pruning.'
+        })
+    ];
+};
+
+interface BonsaiContextValue {
+    ready: boolean;
+    trees: Tree[];
+    customTasks: CustomTask[];
+    addTree: (tree: Omit<Tree, 'id' | 'progress'>) => Tree;
+    updateTree: (id: string, patch: Partial<Tree>) => void;
+    deleteTree: (id: string) => void;
+    addProgress: (treeId: string, entry: Omit<ProgressEntry, 'id'>) => void;
+    addCustomTask: (task: Omit<CustomTask, 'id' | 'done'>) => void;
+    completeTask: (task: CareTask) => void;
+    tasks: CareTask[];
+}
+
+const BonsaiContext = createContext<BonsaiContextValue | null>(null);
+
+export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
+    const [ready, setReady] = useState(false);
+    const [trees, setTrees] = useState<Tree[]>([]);
+    const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
+
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw) as PersistedState;
+                setTrees(parsed.trees ?? []);
+                setCustomTasks(parsed.customTasks ?? []);
+            } else {
+                setTrees(seedTrees());
+            }
+        } catch {
+            setTrees(seedTrees());
+        }
+        setReady(true);
+    }, []);
+
+    useEffect(() => {
+        if (!ready) return;
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ trees, customTasks } satisfies PersistedState));
+        } catch {
+            // storage full (photos) — keep running in memory
+        }
+    }, [ready, trees, customTasks]);
+
+    const addTree: BonsaiContextValue['addTree'] = useCallback((tree) => {
+        const created: Tree = { ...tree, id: uid(), progress: [] };
+        setTrees((t) => [created, ...t]);
+
+        return created;
+    }, []);
+
+    const updateTree: BonsaiContextValue['updateTree'] = useCallback((id, patch) => {
+        setTrees((t) => t.map((tree) => (tree.id === id ? { ...tree, ...patch } : tree)));
+    }, []);
+
+    const deleteTree: BonsaiContextValue['deleteTree'] = useCallback((id) => {
+        setTrees((t) => t.filter((tree) => tree.id !== id));
+        setCustomTasks((c) => c.filter((task) => task.treeId !== id));
+    }, []);
+
+    const addProgress: BonsaiContextValue['addProgress'] = useCallback((treeId, entry) => {
+        setTrees((t) =>
+            t.map((tree) =>
+                tree.id === treeId
+                    ? {
+                          ...tree,
+                          photo: entry.photo ?? tree.photo,
+                          // typed entries also update the care timestamps they represent
+                          lastWired: entry.kind === 'wiring' ? entry.date : tree.lastWired,
+                          lastRepotted: entry.kind === 'repotting' ? entry.date : tree.lastRepotted,
+                          progress: [{ ...entry, id: uid() }, ...tree.progress]
+                      }
+                    : tree
+            )
+        );
+    }, []);
+
+    const addCustomTask: BonsaiContextValue['addCustomTask'] = useCallback((task) => {
+        setCustomTasks((c) => [...c, { ...task, id: uid(), done: false }]);
+    }, []);
+
+    const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
+
+    const completeTask: BonsaiContextValue['completeTask'] = useCallback((task) => {
+        const nowIso = new Date().toISOString();
+        if (task.customId) {
+            setCustomTasks((c) => c.map((t) => (t.id === task.customId ? { ...t, done: true } : t)));
+
+            return;
+        }
+        if (!task.treeId) return;
+        if (task.kind === 'water') updateTree(task.treeId, { lastWatered: nowIso });
+        if (task.kind === 'fertilize') updateTree(task.treeId, { lastFertilized: nowIso });
+        if (task.kind === 'repot') updateTree(task.treeId, { lastRepotted: nowIso });
+        if (task.kind === 'wirecheck') updateTree(task.treeId, { wireCheckedAt: nowIso });
+    }, [updateTree]);
+
+    const value: BonsaiContextValue = {
+        ready,
+        trees,
+        customTasks,
+        addTree,
+        updateTree,
+        deleteTree,
+        addProgress,
+        addCustomTask,
+        completeTask,
+        tasks
+    };
+
+    return <BonsaiContext.Provider value={value}>{children}</BonsaiContext.Provider>;
+};
+
+export const useBonsai = (): BonsaiContextValue => {
+    const ctx = useContext(BonsaiContext);
+    if (!ctx) throw new Error('useBonsai must be used inside BonsaiProvider');
+
+    return ctx;
+};
+
+/** Derive due care tasks from species schedules + last-done dates */
+const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
+    const now = new Date();
+    const season = currentSeason(now);
+    const tasks: CareTask[] = [];
+
+    for (const tree of trees) {
+        const species = speciesById(tree.speciesId);
+        if (!species) continue;
+
+        const waterInterval = species.care.wateringIntervalDays[season];
+        const lastWatered = tree.lastWatered ? new Date(tree.lastWatered) : addDays(now, -waterInterval);
+        tasks.push({
+            key: `water-${tree.id}`,
+            kind: 'water',
+            treeId: tree.id,
+            title: `Water ${tree.name}`,
+            detail: species.care.watering,
+            due: addDays(startOfDay(lastWatered), waterInterval)
+        });
+
+        // Cuttings: no feeding or repotting until rooted — only watering and photo reminders
+        const isCutting = tree.stage === 'cutting';
+
+        const feedInterval = species.care.fertilizingIntervalDays[season];
+        if (feedInterval !== null && !isCutting) {
+            const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : addDays(now, -feedInterval);
+            tasks.push({
+                key: `fertilize-${tree.id}`,
+                kind: 'fertilize',
+                treeId: tree.id,
+                title: `Fertilize ${tree.name}`,
+                detail: species.care.fertilizing,
+                due: addDays(startOfDay(lastFed), feedInterval)
+            });
+        }
+
+        // Repotting: due in the next spring window after the interval elapses
+        const lastRepotted = tree.lastRepotted ? new Date(tree.lastRepotted) : new Date(tree.acquiredAt);
+        const repotYear = lastRepotted.getFullYear() + species.care.repotEveryYears;
+        const repotDue = new Date(repotYear, 2, 15);
+        if (!isCutting && repotDue.getTime() - now.getTime() < 60 * 86_400_000) {
+            tasks.push({
+                key: `repot-${tree.id}`,
+                kind: 'repot',
+                treeId: tree.id,
+                title: `Repot ${tree.name}`,
+                detail: species.care.repotting,
+                due: repotDue
+            });
+        }
+
+        // Wire check: wire bites in as branches thicken — check 6 weeks after wiring
+        if (tree.lastWired && (!tree.wireCheckedAt || tree.wireCheckedAt < tree.lastWired)) {
+            tasks.push({
+                key: `wirecheck-${tree.id}`,
+                kind: 'wirecheck',
+                treeId: tree.id,
+                title: `Check wire on ${tree.name}`,
+                detail: 'Make sure the wire is not cutting into the bark; remove or rewrap if needed.',
+                due: addDays(startOfDay(new Date(tree.lastWired)), 42)
+            });
+        }
+
+        // Seasonal photo reminder: no progress photo taken this season yet
+        const seasonHasPhoto = tree.progress.some(
+            (p) => p.photo && currentSeason(new Date(p.date)) === season && daysBetween(new Date(p.date), now) < 100
+        );
+        if (!seasonHasPhoto) {
+            tasks.push({
+                key: `photo-${tree.id}`,
+                kind: 'photo',
+                treeId: tree.id,
+                title: `Seasonal photo of ${tree.name}`,
+                detail: 'Capture this season for the visual history of your tree.',
+                due: now
+            });
+        }
+    }
+
+    for (const task of customTasks) {
+        if (task.done) continue;
+        tasks.push({
+            key: `custom-${task.id}`,
+            kind: 'custom',
+            treeId: task.treeId,
+            title: task.title,
+            detail: 'Custom task',
+            due: new Date(task.due),
+            customId: task.id
+        });
+    }
+
+    return tasks.sort((a, b) => a.due.getTime() - b.due.getTime());
+};
+
+const daysBetween = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / 86_400_000);

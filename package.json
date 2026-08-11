@@ -1,13 +1,12 @@
 {
-    "name": "nextjs-15-starter-shadcn",
+    "name": "mr-bonsai",
     "version": "1.0.0",
-    "private": false,
-    "website": "https://nextjs-15-starter-shadcn.vercel.app/",
+    "private": true,
     "license": "MIT",
     "scripts": {
         "dev": "next dev --turbopack",
-        "build": "next build",
-        "start": "next start",
+        "build": "BUILD_DIR=.next-build next build",
+        "start": "BUILD_DIR=.next-build next start",
         "lint": "next lint",
         "lint:fix": "eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
         "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
