@@ -1,10 +1,25 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
 import { cn } from '@/lib/utils';
 
 import { Sprout } from 'lucide-react';
 
 export const TreePhoto = ({ photo, name, className }: { photo?: string; name: string; className?: string }) => {
-    if (photo) {
-        return <img src={photo} alt={name} className={cn('size-full object-cover', className)} />;
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => setFailed(false), [photo]);
+
+    if (photo && !failed) {
+        return (
+            <img
+                src={photo}
+                alt={name}
+                onError={() => setFailed(true)}
+                className={cn('size-full object-cover', className)}
+            />
+        );
     }
 
     return (

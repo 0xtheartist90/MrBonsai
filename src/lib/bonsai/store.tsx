@@ -15,6 +15,20 @@ interface PersistedState {
 
 const uid = (): string => Math.random().toString(36).slice(2, 10);
 
+/**
+ * Brings collections saved by an older build up to date. Photos shipped as JPEG
+ * until they were converted to WebP, and the JPEGs no longer exist — a browser
+ * that stored the collection before that would show broken images forever.
+ */
+const migratePhotoPath = (photo?: string): string | undefined =>
+    photo?.startsWith('/images/trees/') ? photo.replace(/\.jpg$/i, '.webp') : photo;
+
+const migrateTree = (tree: Tree): Tree => ({
+    ...tree,
+    photo: migratePhotoPath(tree.photo),
+    progress: tree.progress.map((entry) => ({ ...entry, photo: migratePhotoPath(entry.photo) }))
+});
+
 const seedTrees = (): Tree[] => {
     const now = new Date();
     const year = now.getFullYear();
@@ -190,7 +204,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw) as PersistedState;
-                setTrees(parsed.trees ?? []);
+                setTrees((parsed.trees ?? []).map(migrateTree));
                 setCustomTasks(parsed.customTasks ?? []);
             } else {
                 setTrees(seedTrees());
