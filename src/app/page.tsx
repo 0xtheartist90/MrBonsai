@@ -83,7 +83,7 @@ const MyTreesPage = () => {
                             <Link
                                 key={tree.id}
                                 href={`/trees/${tree.id}`}
-                                className='group bg-card relative aspect-[3/4] overflow-hidden rounded-[1.75rem] shadow-sm transition-transform active:scale-[0.97]'>
+                                className='group bg-card relative aspect-[5/8] overflow-hidden rounded-[1.75rem] shadow-sm transition-transform active:scale-[0.97]'>
                                 <TreePhoto photo={tree.photo} name={tree.name} />
                                 <div className='absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/5' />
 

@@ -9,11 +9,22 @@ import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween } from '@/lib/bonsai/season';
 import { speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
-import { treeUrgency } from '@/lib/bonsai/urgency';
+import { stylingFocus, treeUrgency } from '@/lib/bonsai/urgency';
 import type { TaskKind } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
-import { Camera, ChevronLeft, ChevronRight, Droplets, Leaf, Shovel, Sprout, TreeDeciduous } from 'lucide-react';
+import {
+    Cable,
+    Camera,
+    ChevronLeft,
+    ChevronRight,
+    Droplets,
+    Leaf,
+    Scissors,
+    Shovel,
+    Sprout,
+    TreeDeciduous
+} from 'lucide-react';
 
 const FILTERS: { kind: TaskKind; label: string; icon: typeof Droplets }[] = [
     { kind: 'water', label: 'Water', icon: Droplets },
@@ -45,6 +56,7 @@ const GrowPage = () => {
     const cuttings = trees.filter((t) => t.stage === 'cutting').length;
 
     const current = needsAttention[featured % Math.max(needsAttention.length, 1)];
+    const styling = stylingFocus(trees, now);
 
     return (
         <div className='space-y-5'>
@@ -153,6 +165,36 @@ const GrowPage = () => {
                             <p className='text-xl font-bold drop-shadow-sm'>{current.tree.name}</p>
                             <p className='text-xs text-white/80'>
                                 {speciesById(current.tree.speciesId)?.name} · {current.tree.location}
+                            </p>
+                        </div>
+                    </Link>
+                </section>
+            )}
+
+            {styling && (
+                <section>
+                    <h2 className='mb-2 font-semibold'>Work on this</h2>
+                    <Link
+                        href={`/trees/${styling.tree.id}?progress=1`}
+                        className='bg-card flex gap-3 rounded-3xl p-3 shadow-sm transition-transform active:scale-[0.99]'>
+                        <div className='size-24 shrink-0 overflow-hidden rounded-2xl'>
+                            <TreePhoto photo={styling.tree.photo} name={styling.tree.name} />
+                        </div>
+                        <div className='min-w-0 flex-1 py-0.5'>
+                            <span className='bg-accent text-accent-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold'>
+                                {styling.kind === 'wiring' ? (
+                                    <Cable className='size-3' />
+                                ) : (
+                                    <Scissors className='size-3' />
+                                )}
+                                {styling.title}
+                            </span>
+                            <p className='mt-1 truncate text-sm font-semibold'>{styling.tree.name}</p>
+                            <p className='text-muted-foreground line-clamp-2 text-xs leading-snug'>{styling.detail}</p>
+                            <p className='text-muted-foreground mt-1 text-[11px]'>
+                                {styling.everStyled
+                                    ? `Last styled ${styling.daysSince} days ago`
+                                    : 'No styling logged yet'}
                             </p>
                         </div>
                     </Link>
