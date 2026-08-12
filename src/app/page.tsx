@@ -1,37 +1,31 @@
 'use client';
 
-import { useState } from 'react';
-
 import Link from 'next/link';
 
 import { TreePhoto } from '@/components/bonsai/tree-photo';
-import { speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
 import { treeUrgency } from '@/lib/bonsai/urgency';
 import { cn } from '@/lib/utils';
-import { Input } from '@/registry/new-york-v4/ui/input';
 
-import { Search, Sprout } from 'lucide-react';
+import { Sprout } from 'lucide-react';
+
+/**
+ * Two rows of cards fill the screen exactly, on any device height.
+ * Subtracted: page padding + header + grid offset + the floating nav's zone.
+ */
+const CARD_HEIGHT = 'h-[calc((100dvh-11.25rem)/2-0.375rem)]';
 
 const MyTreesPage = () => {
     const { ready, trees, tasks } = useBonsai();
-    const [query, setQuery] = useState('');
 
     if (!ready) return null;
 
-    const filtered = trees
-        .filter((tree) => {
-            const species = speciesById(tree.speciesId);
-            const haystack = `${tree.name} ${species?.name ?? ''} ${species?.latin ?? ''}`.toLowerCase();
-
-            return haystack.includes(query.toLowerCase());
-        })
-        // oldest first; trees without a known start year go last
-        .sort(
-            (a, b) =>
-                (a.birthYear ?? Number.MAX_SAFE_INTEGER) - (b.birthYear ?? Number.MAX_SAFE_INTEGER) ||
-                new Date(a.acquiredAt).getTime() - new Date(b.acquiredAt).getTime()
-        );
+    // oldest first; trees without a known start year go last
+    const sorted = [...trees].sort(
+        (a, b) =>
+            (a.birthYear ?? Number.MAX_SAFE_INTEGER) - (b.birthYear ?? Number.MAX_SAFE_INTEGER) ||
+            new Date(a.acquiredAt).getTime() - new Date(b.acquiredAt).getTime()
+    );
 
     return (
         <div className='space-y-4'>
@@ -49,33 +43,16 @@ const MyTreesPage = () => {
                 </span>
             </header>
 
-            <div className='relative'>
-                <Search className='text-muted-foreground absolute top-1/2 left-4 size-4 -translate-y-1/2' />
-                <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder='Search your collection'
-                    className='bg-card h-12 rounded-full border-none pl-11 shadow-sm'
-                />
-            </div>
-
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
                 <div className='bg-card rounded-3xl p-6 text-center shadow-sm'>
-                    <p className='font-medium'>{trees.length === 0 ? 'No trees yet' : 'No matches'}</p>
+                    <p className='font-medium'>No trees yet</p>
                     <p className='text-muted-foreground mt-1 text-sm'>
-                        {trees.length === 0 ? (
-                            <>
-                                Tap the <span className='text-primary font-semibold'>+</span> button to add your first
-                                bonsai.
-                            </>
-                        ) : (
-                            'Try a different search term.'
-                        )}
+                        Tap the <span className='text-primary font-semibold'>+</span> button to add your first bonsai.
                     </p>
                 </div>
             ) : (
                 <div className='grid grid-cols-2 gap-3'>
-                    {filtered.map((tree) => {
+                    {sorted.map((tree) => {
                         const urgency = treeUrgency(tasks, tree.id);
                         const age = tree.birthYear ? new Date().getFullYear() - tree.birthYear : undefined;
 
@@ -83,7 +60,10 @@ const MyTreesPage = () => {
                             <Link
                                 key={tree.id}
                                 href={`/trees/${tree.id}`}
-                                className='group bg-card relative aspect-[5/8] overflow-hidden rounded-[1.75rem] shadow-sm transition-transform active:scale-[0.97]'>
+                                className={cn(
+                                    'bg-card relative overflow-hidden rounded-[1.75rem] shadow-sm transition-transform active:scale-[0.97]',
+                                    CARD_HEIGHT
+                                )}>
                                 <TreePhoto photo={tree.photo} name={tree.name} />
                                 <div className='absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/5' />
 
