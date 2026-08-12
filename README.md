@@ -26,12 +26,13 @@ npm run dev      # http://localhost:3000
 ```
 
 ```bash
-npm run build       # production build (writes to .next-build)
+npm run build        # production build (used by Vercel; writes to .next)
+npm run build:local  # local build check (writes to .next-build)
 npm run type-check
 npm run lint
 ```
 
-Builds use a separate output directory from the dev server so `npm run build` can run while `npm run dev` is up.
+Use `build:local` when the dev server is running — it writes to a separate directory so it never clobbers the dev server's `.next` cache. Deployment platforms run the standard `build`, which must stay on `.next`.
 
 ## Collection reference
 
