@@ -64,7 +64,8 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const { id } = use(params);
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { ready, trees, tasks, addProgress, updateProgress, deleteProgress, deleteTree, updateTree } = useBonsai();
+    const { ready, trees, tasks, addProgress, updateProgress, deleteProgress, deleteTree, updateTree, replaceCover } =
+        useBonsai();
 
     const [progressNote, setProgressNote] = useState('');
     const [progressPhoto, setProgressPhoto] = useState<string>();
@@ -485,8 +486,8 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                         <PhotoInput
                             value={tree.photo?.startsWith('idb:') ? undefined : tree.photo}
                             onChange={(dataUrl) => {
-                                updateTree(tree.id, { photo: dataUrl });
-                                toast.success('Cover photo updated.');
+                                replaceCover(tree.id, dataUrl);
+                                toast.success('Cover updated — the old photo is kept in the Progress timeline.');
                             }}
                             label='Tap to replace the cover photo'
                         />

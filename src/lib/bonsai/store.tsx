@@ -16,7 +16,7 @@ interface PersistedState {
     rev?: number;
 }
 
-const DATA_REV = 3;
+const DATA_REV = 4;
 
 /** 26 Aug 2026: the user watered the entire collection by hand */
 const WATERED_ALL_AT = '2026-08-26T10:00:00.000Z';
@@ -56,6 +56,25 @@ const migrateTree = (tree: Tree): Tree => ({
 /** Every idb photo reference a tree owns — cover and progress timeline */
 const photoRefs = (tree: Tree): string[] =>
     [tree.photo, ...tree.progress.map((p) => p.photo)].filter(isPhotoRef);
+
+/**
+ * A cover photo that is about to be replaced and lives nowhere else would vanish —
+ * archive it as a timeline entry so the visual history keeps every photo.
+ */
+const archiveCoverEntry = (tree: Tree): ProgressEntry | null => {
+    if (!tree.photo || tree.progress.some((p) => p.photo === tree.photo)) return null;
+
+    // seed paths date from acquisition; an uploaded cover's origin is unknown, so date it now
+    const fromSeed = tree.photo.startsWith('/images/trees/');
+
+    return {
+        id: uid(),
+        date: fromSeed ? tree.acquiredAt : new Date().toISOString(),
+        note: 'Earlier cover photo — kept automatically when it was replaced.',
+        kinds: [],
+        photo: tree.photo
+    };
+};
 
 /** Kamthieng Market purchases of 23 & 26 Aug 2026 plus the existing orange plant */
 const newCollectionAug2026 = (): Tree[] => {
@@ -314,6 +333,8 @@ interface BonsaiContextValue {
     customTasks: CustomTask[];
     addTree: (tree: Omit<Tree, 'id' | 'progress'>) => Tree;
     updateTree: (id: string, patch: Partial<Tree>) => void;
+    /** Set a new cover photo, archiving the old one into the timeline */
+    replaceCover: (id: string, dataUrl: string) => void;
     deleteTree: (id: string) => void;
     addProgress: (treeId: string, entry: Omit<ProgressEntry, 'id'>) => void;
     updateProgress: (treeId: string, entryId: string, patch: Partial<Omit<ProgressEntry, 'id'>>) => void;
@@ -354,6 +375,29 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                         !t.lastWatered || t.lastWatered < WATERED_ALL_AT ? { ...t, lastWatered: WATERED_ALL_AT } : t
                     );
                 }
+                // rev 4: replacing a cover photo used to overwrite it silently — restore the
+                // original seed photo into the timeline of any tree whose cover moved on
+                if (rev < 4) {
+                    const seedPhotoByName = new Map(seedTrees().map((t) => [t.name, t.photo]));
+                    trees = trees.map((t) => {
+                        const original = seedPhotoByName.get(t.name);
+                        if (!original || t.photo === original || t.progress.some((p) => p.photo === original)) return t;
+
+                        return {
+                            ...t,
+                            progress: [
+                                ...t.progress,
+                                {
+                                    id: uid(),
+                                    date: t.acquiredAt,
+                                    note: 'Original photo — restored to the timeline when the cover was replaced.',
+                                    kinds: [],
+                                    photo: original
+                                }
+                            ]
+                        };
+                    });
+                }
                 setTrees(trees);
                 setCustomTasks(parsed.customTasks ?? []);
             } else {
@@ -389,6 +433,18 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         setTrees((t) => t.map((tree) => (tree.id === id ? { ...tree, ...safePatch } : tree)));
     }, []);
 
+    const replaceCover: BonsaiContextValue['replaceCover'] = useCallback((id, dataUrl) => {
+        const photo = internPhoto(dataUrl);
+        setTrees((t) =>
+            t.map((tree) => {
+                if (tree.id !== id) return tree;
+                const archived = archiveCoverEntry(tree);
+
+                return { ...tree, photo, progress: archived ? [...tree.progress, archived] : tree.progress };
+            })
+        );
+    }, []);
+
     const deleteTree: BonsaiContextValue['deleteTree'] = useCallback((id) => {
         setTrees((t) => {
             t.filter((tree) => tree.id === id).flatMap(photoRefs).forEach(removePhoto);
@@ -401,9 +457,12 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     const addProgress: BonsaiContextValue['addProgress'] = useCallback((treeId, entry) => {
         const photo = internPhoto(entry.photo);
         setTrees((t) =>
-            t.map((tree) =>
-                tree.id === treeId
-                    ? {
+            t.map((tree) => {
+                if (tree.id !== treeId) return tree;
+                // a photo entry becomes the new cover — keep the old cover in the timeline
+                const archived = photo ? archiveCoverEntry(tree) : null;
+
+                return {
                           ...tree,
                           photo: photo ?? tree.photo,
                           // typed entries also update the care timestamps they represent
@@ -412,10 +471,13 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                           lastRepotSeverity: entry.kinds?.includes('repotting')
                               ? (entry.repotSeverity ?? 'moderate')
                               : tree.lastRepotSeverity,
-                          progress: [{ ...entry, photo, id: uid() }, ...tree.progress]
-                      }
-                    : tree
-            )
+                          progress: [
+                              { ...entry, photo, id: uid() },
+                              ...tree.progress,
+                              ...(archived ? [archived] : [])
+                          ]
+                      };
+            })
         );
     }, []);
 
@@ -485,6 +547,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         customTasks,
         addTree,
         updateTree,
+        replaceCover,
         deleteTree,
         addProgress,
         updateProgress,
