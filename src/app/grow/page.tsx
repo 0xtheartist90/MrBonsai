@@ -65,8 +65,8 @@ const GrowPage = () => {
                     <p className='text-muted-foreground text-sm'>{SEASON_LABEL[season]} · it&apos;s plant care time</p>
                     <h1 className='text-3xl font-bold tracking-tight'>Grow</h1>
                 </div>
-                <span className='from-primary to-primary/70 text-primary-foreground shadow-primary/25 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg'>
-                    <Sprout className='size-6' />
+                <span className='shadow-primary/20 flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg'>
+                    <img src='/images/logo-mark.png' alt='Mr. Bonsai logo' className='size-10' />
                 </span>
             </header>
 

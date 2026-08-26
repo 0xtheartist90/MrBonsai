@@ -7,8 +7,6 @@ import { useBonsai } from '@/lib/bonsai/store';
 import { treeUrgency } from '@/lib/bonsai/urgency';
 import { cn } from '@/lib/utils';
 
-import { Sprout } from 'lucide-react';
-
 /**
  * Two rows of cards fill the screen exactly, on any device height.
  * Subtracted: page padding + header + grid offset + the floating nav's zone.
@@ -38,8 +36,8 @@ const MyTreesPage = () => {
                         Mr. <span className='text-primary'>Bonsai</span>
                     </h1>
                 </div>
-                <span className='from-primary to-primary/70 text-primary-foreground shadow-primary/25 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg'>
-                    <Sprout className='size-6' />
+                <span className='shadow-primary/20 flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg'>
+                    <img src='/images/logo-mark.png' alt='Mr. Bonsai logo' className='size-10' />
                 </span>
             </header>
 
