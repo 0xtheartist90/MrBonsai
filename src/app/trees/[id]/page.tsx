@@ -626,7 +626,7 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                     placeholder={
                                         species.care.fertilizingIntervalDays[season] === null
                                             ? 'Paused this season'
-                                            : `Label cycle: ~${NPK_TOPUP_DAYS}`
+                                            : `Label: ${NPK_TOPUP_DAYS} (4 months)`
                                     }
                                     onBlur={(e) =>
                                         updateTree(tree.id, {

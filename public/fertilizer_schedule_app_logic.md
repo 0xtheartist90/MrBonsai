@@ -699,3 +699,19 @@ Until those values are entered, show:
 **“Use manufacturer label dosage.”**
 
 Never invent an exact fertilizer dose from the product name alone.
+
+---
+
+# Product-label data — ENTERED (26 Aug 2026)
+
+## Multitech Slow-Release 16-16-16
+
+- **Release duration:** 4 months (120 days) — implemented as the app's top-up cycle
+- **Packaging:** 1,000 g resealable bag
+- **Dose by pot size:**
+  - 5-inch pot: 3-4 g
+  - 10-inch pot: 6-8 g
+- **Application:** at the bottom of the pot or sprinkled on the soil surface, every 4 months or per plant health
+- **Note:** for cacti/succulent-style plants use at least 50% less than indicated (relevant for Dwarf Jade)
+
+Still to be entered: Nic-Spray exact dilution and application method; BStart exact dilution and maximum frequency.

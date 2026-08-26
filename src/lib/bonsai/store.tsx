@@ -21,8 +21,8 @@ const DATA_REV = 3;
 /** 26 Aug 2026: the user watered the entire collection by hand */
 const WATERED_ALL_AT = '2026-08-26T10:00:00.000Z';
 
-/** Slow-release NPK top-up cycle (typical ~3 months); the product label wins via careOverrides */
-export const NPK_TOPUP_DAYS = 90;
+/** Multitech 16-16-16 label: 4-month supply — 3-4 g per 5" pot, 6-8 g per 10" pot */
+export const NPK_TOPUP_DAYS = 120;
 
 const uid = (): string => Math.random().toString(36).slice(2, 10);
 
@@ -552,7 +552,7 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
                 kind: 'fertilize',
                 treeId: tree.id,
                 title: `Top up 16-16-16 · ${tree.name}`,
-                detail: 'Slow-release, label dosage — skip if granules are still visible. Only on a healthy, actively growing tree.',
+                detail: 'Multitech 4-month slow-release: ±3-4 g for a 5" pot, 6-8 g for 10". Skip if granules remain; healthy, growing trees only.',
                 due: later(addDays(startOfDay(lastFed), feedInterval), lastRepot && addDays(lastRepot, npkPauseDays))
             });
         }
