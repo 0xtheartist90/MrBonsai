@@ -81,6 +81,8 @@ export interface Tree {
     lastRepotSeverity?: RepotSeverity;
     lastWired?: string;
     wireCheckedAt?: string;
+    /** Last time this tree itself changed — sync merges per tree on this stamp */
+    modifiedAt?: string;
 }
 
 export type TaskKind = 'water' | 'fertilize' | 'micro' | 'repot' | 'photo' | 'wirecheck' | 'custom';

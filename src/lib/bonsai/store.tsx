@@ -25,6 +25,8 @@ interface PersistedState {
     rev?: number;
     /** Last local change — the newer side wins when local and cloud state differ */
     updatedAt?: string;
+    /** Tombstones: ids of deleted trees, so a merge does not resurrect them */
+    deletedTreeIds?: string[];
 }
 
 export type SyncStatus = 'off' | 'signedOut' | 'syncing' | 'synced' | 'error';
@@ -65,6 +67,45 @@ const migrateTree = (tree: Tree): Tree => ({
         kinds: entry.kinds ?? (entry.kind && entry.kind !== 'note' ? [entry.kind] : [])
     }))
 });
+
+/** Stamps a tree as just-changed so per-tree sync merging knows which copy is newest */
+const touch = (tree: Tree): Tree => ({ ...tree, modifiedAt: new Date().toISOString() });
+
+/**
+ * Per-tree merge: for every tree id the copy with the newer modifiedAt wins, trees
+ * that exist on only one side survive, tombstoned ids stay gone. This is what stops
+ * one device's unrelated edit from wiping another device's new progress entry —
+ * whole-state last-write-wins did exactly that.
+ */
+const mergeTrees = (local: Tree[], remote: Tree[], deleted: Set<string>): Tree[] => {
+    const byId = new Map<string, Tree>();
+    for (const tree of remote) byId.set(tree.id, tree);
+    for (const tree of local) {
+        const other = byId.get(tree.id);
+        if (!other || (tree.modifiedAt ?? '') >= (other.modifiedAt ?? '')) byId.set(tree.id, tree);
+    }
+    // devices that seeded independently can hold the same tree under different ids
+    const byName = new Map<string, Tree>();
+    for (const tree of byId.values()) {
+        if (deleted.has(tree.id)) continue;
+        const twin = byName.get(`${tree.name}|${tree.speciesId}`);
+        if (!twin || (tree.modifiedAt ?? '') >= (twin.modifiedAt ?? '')) byName.set(`${tree.name}|${tree.speciesId}`, tree);
+    }
+
+    return [...byName.values()];
+};
+
+const mergeCustomTasks = (local: CustomTask[], remote: CustomTask[]): CustomTask[] => {
+    const byId = new Map<string, CustomTask>();
+    for (const task of remote) byId.set(task.id, task);
+    for (const task of local) {
+        const other = byId.get(task.id);
+        // done wins so a completed task doesn't reopen after a merge
+        byId.set(task.id, other && other.done ? other : task);
+    }
+
+    return [...byId.values()];
+};
 
 /** Every idb photo reference a tree owns — cover and progress timeline */
 const photoRefs = (tree: Tree): string[] =>
@@ -429,6 +470,11 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     // local edits — stamping them as "newest" would push stale data over the cloud.
     const suppressNextPersistRef = useRef(true);
     const lastPullAtRef = useRef(0);
+    const [deletedTreeIds, setDeletedTreeIds] = useState<string[]>([]);
+    // live mirrors for the merge inside pullFromCloud, which must not re-create on every edit
+    const treesRef = useRef<Tree[]>([]);
+    const customTasksRef = useRef<CustomTask[]>([]);
+    const deletedRef = useRef<string[]>([]);
 
     /** Adopt cloud state when it is newer than what this device has */
     const pullFromCloud = useCallback(async () => {
@@ -440,12 +486,23 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         lastPullAtRef.current = Date.now();
         setSyncStatus('syncing');
         const remote = await pullState();
-        if (remote && (!localUpdatedAtRef.current || remote.updatedAt > localUpdatedAtRef.current)) {
-            const state = hydrate(remote.data as PersistedState);
-            localUpdatedAtRef.current = remote.updatedAt;
-            suppressNextPersistRef.current = true;
-            setTrees(state.trees);
-            setCustomTasks(state.customTasks);
+        if (remote) {
+            const remoteParsed = remote.data as PersistedState;
+            const remoteState = hydrate(remoteParsed);
+            const deleted = new Set([...deletedRef.current, ...(remoteParsed.deletedTreeIds ?? [])]);
+            const mergedTrees = mergeTrees(treesRef.current, remoteState.trees, deleted);
+            const mergedTasks = mergeCustomTasks(customTasksRef.current, remoteState.customTasks);
+            // when the merge holds anything the cloud is missing, the save effect must push it
+            const differsFromRemote =
+                JSON.stringify(mergedTrees) !== JSON.stringify(remoteState.trees) ||
+                JSON.stringify(mergedTasks) !== JSON.stringify(remoteState.customTasks);
+            if (!localUpdatedAtRef.current || remote.updatedAt > localUpdatedAtRef.current) {
+                localUpdatedAtRef.current = remote.updatedAt;
+            }
+            suppressNextPersistRef.current = !differsFromRemote;
+            setTrees(mergedTrees);
+            setCustomTasks(mergedTasks);
+            setDeletedTreeIds([...deleted]);
         }
         setSyncStatus('synced');
         void flushPhotoUploads();
@@ -458,10 +515,16 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                 const parsed = JSON.parse(raw) as PersistedState;
                 const state = hydrate(parsed);
                 localUpdatedAtRef.current = parsed.updatedAt;
+                treesRef.current = state.trees;
+                customTasksRef.current = state.customTasks;
+                deletedRef.current = parsed.deletedTreeIds ?? [];
                 setTrees(state.trees);
                 setCustomTasks(state.customTasks);
+                setDeletedTreeIds(deletedRef.current);
             } else {
-                setTrees(seedTrees());
+                const seeded = seedTrees();
+                treesRef.current = seeded;
+                setTrees(seeded);
             }
         } catch {
             setTrees(seedTrees());
@@ -474,7 +537,10 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         if (!ready) return;
-        // hydration (initial load or adopting cloud state) is not a local edit:
+        treesRef.current = trees;
+        customTasksRef.current = customTasks;
+        deletedRef.current = deletedTreeIds;
+        // hydration (initial load or a merge that matched the cloud) is not a local edit:
         // persist it under its existing timestamp and never push it
         if (suppressNextPersistRef.current) {
             suppressNextPersistRef.current = false;
@@ -484,6 +550,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                     JSON.stringify({
                         trees,
                         customTasks,
+                        deletedTreeIds,
                         rev: DATA_REV,
                         updatedAt: localUpdatedAtRef.current ?? new Date().toISOString()
                     } satisfies PersistedState)
@@ -499,7 +566,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         try {
             localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ trees, customTasks, rev: DATA_REV, updatedAt } satisfies PersistedState)
+                JSON.stringify({ trees, customTasks, deletedTreeIds, rev: DATA_REV, updatedAt } satisfies PersistedState)
             );
         } catch {
             // storage full — keep running in memory
@@ -509,11 +576,14 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         pushTimerRef.current = setTimeout(() => {
             void (async () => {
                 if (!(await getUserId())) return;
-                const ok = await pushState({ trees, customTasks, rev: DATA_REV, updatedAt }, updatedAt);
+                const ok = await pushState(
+                    { trees, customTasks, deletedTreeIds, rev: DATA_REV, updatedAt },
+                    updatedAt
+                );
                 setSyncStatus(ok ? 'synced' : 'error');
             })();
         }, 1500);
-    }, [ready, trees, customTasks]);
+    }, [ready, trees, customTasks, deletedTreeIds]);
 
     // returning to the app (tab focus, phone unlock) picks up changes from other devices
     useEffect(() => {
@@ -554,12 +624,12 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         try {
             localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ trees, customTasks, rev: DATA_REV, updatedAt } satisfies PersistedState)
+                JSON.stringify({ trees, customTasks, deletedTreeIds, rev: DATA_REV, updatedAt } satisfies PersistedState)
             );
         } catch {
             // storage full — push proceeds regardless
         }
-        const ok = await pushState({ trees, customTasks, rev: DATA_REV, updatedAt }, updatedAt);
+        const ok = await pushState({ trees, customTasks, deletedTreeIds, rev: DATA_REV, updatedAt }, updatedAt);
         setSyncStatus(ok ? 'synced' : 'error');
         await flushPhotoUploads();
 
@@ -567,7 +637,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     }, [trees, customTasks]);
 
     const addTree: BonsaiContextValue['addTree'] = useCallback((tree) => {
-        const created: Tree = { ...tree, id: uid(), progress: [], photo: internPhoto(tree.photo) };
+        const created: Tree = touch({ ...tree, id: uid(), progress: [], photo: internPhoto(tree.photo) });
         setTrees((t) => [created, ...t]);
 
         return created;
@@ -575,7 +645,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
 
     const updateTree: BonsaiContextValue['updateTree'] = useCallback((id, patch) => {
         const safePatch = 'photo' in patch ? { ...patch, photo: internPhoto(patch.photo) } : patch;
-        setTrees((t) => t.map((tree) => (tree.id === id ? { ...tree, ...safePatch } : tree)));
+        setTrees((t) => t.map((tree) => (tree.id === id ? touch({ ...tree, ...safePatch }) : tree)));
     }, []);
 
     const replaceCover: BonsaiContextValue['replaceCover'] = useCallback((id, dataUrl) => {
@@ -585,7 +655,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                 if (tree.id !== id) return tree;
                 const archived = archiveCoverEntry(tree);
 
-                return { ...tree, photo, progress: archived ? [...tree.progress, archived] : tree.progress };
+                return touch({ ...tree, photo, progress: archived ? [...tree.progress, archived] : tree.progress });
             })
         );
     }, []);
@@ -597,6 +667,8 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
             return t.filter((tree) => tree.id !== id);
         });
         setCustomTasks((c) => c.filter((task) => task.treeId !== id));
+        // tombstone so a sync merge cannot resurrect it from another device
+        setDeletedTreeIds((d) => (d.includes(id) ? d : [...d, id]));
     }, []);
 
     const addProgress: BonsaiContextValue['addProgress'] = useCallback((treeId, entry) => {
@@ -607,7 +679,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                 // a photo entry becomes the new cover — keep the old cover in the timeline
                 const archived = photo ? archiveCoverEntry(tree) : null;
 
-                return {
+                return touch({
                           ...tree,
                           photo: photo ?? tree.photo,
                           // typed entries also update the care timestamps they represent
@@ -621,7 +693,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                               ...tree.progress,
                               ...(archived ? [archived] : [])
                           ]
-                      };
+                      });
             })
         );
     }, []);
@@ -631,12 +703,12 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         setTrees((t) =>
             t.map((tree) =>
                 tree.id === treeId
-                    ? {
+                    ? touch({
                           ...tree,
                           progress: tree.progress.map((entry) =>
                               entry.id === entryId ? { ...entry, ...safePatch } : entry
                           )
-                      }
+                      })
                     : tree
             )
         );
@@ -646,7 +718,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         // the stored photo is deliberately kept: it makes Undo possible, and orphans are cheap
         setTrees((t) =>
             t.map((tree) =>
-                tree.id === treeId ? { ...tree, progress: tree.progress.filter((p) => p.id !== entryId) } : tree
+                tree.id === treeId ? touch({ ...tree, progress: tree.progress.filter((p) => p.id !== entryId) }) : tree
             )
         );
     }, []);
@@ -673,13 +745,13 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                 // due = lastWatered + interval, so aim lastWatered such that due lands tomorrow
                 const lastWatered = addDays(startOfDay(new Date()), 1 - interval).toISOString();
 
-                return { ...tree, lastWatered };
+                return touch({ ...tree, lastWatered });
             })
         );
     }, []);
 
     const insertProgress: BonsaiContextValue['insertProgress'] = useCallback((treeId, entry) => {
-        setTrees((t) => t.map((tree) => (tree.id === treeId ? { ...tree, progress: [entry, ...tree.progress] } : tree)));
+        setTrees((t) => t.map((tree) => (tree.id === treeId ? touch({ ...tree, progress: [entry, ...tree.progress] }) : tree)));
     }, []);
 
     const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
