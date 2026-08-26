@@ -2,6 +2,7 @@
 
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { isPhotoRef, removePhoto, savePhoto } from './photo-db';
 import { SEASON_LABEL, addDays, currentSeason, startOfDay } from './season';
 import { speciesById } from './species';
 import type { CareTask, CustomTask, ProgressEntry, Tree } from './types';
@@ -23,11 +24,23 @@ const uid = (): string => Math.random().toString(36).slice(2, 10);
 const migratePhotoPath = (photo?: string): string | undefined =>
     photo?.startsWith('/images/trees/') ? photo.replace(/\.jpg$/i, '.webp') : photo;
 
+/**
+ * Uploaded photos used to live inline in localStorage as data URLs, which blew
+ * through its ~5 MB quota after a few uploads and silently lost photos. New
+ * uploads go to IndexedDB; this moves any inline photo a previous build stored.
+ */
+const internPhoto = (photo?: string): string | undefined =>
+    photo?.startsWith('data:') ? savePhoto(uid(), photo) : photo;
+
 const migrateTree = (tree: Tree): Tree => ({
     ...tree,
-    photo: migratePhotoPath(tree.photo),
-    progress: tree.progress.map((entry) => ({ ...entry, photo: migratePhotoPath(entry.photo) }))
+    photo: internPhoto(migratePhotoPath(tree.photo)),
+    progress: tree.progress.map((entry) => ({ ...entry, photo: internPhoto(migratePhotoPath(entry.photo)) }))
 });
+
+/** Every idb photo reference a tree owns — cover and progress timeline */
+const photoRefs = (tree: Tree): string[] =>
+    [tree.photo, ...tree.progress.map((p) => p.photo)].filter(isPhotoRef);
 
 const seedTrees = (): Tree[] => {
     const now = new Date();
@@ -225,32 +238,38 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     }, [ready, trees, customTasks]);
 
     const addTree: BonsaiContextValue['addTree'] = useCallback((tree) => {
-        const created: Tree = { ...tree, id: uid(), progress: [] };
+        const created: Tree = { ...tree, id: uid(), progress: [], photo: internPhoto(tree.photo) };
         setTrees((t) => [created, ...t]);
 
         return created;
     }, []);
 
     const updateTree: BonsaiContextValue['updateTree'] = useCallback((id, patch) => {
-        setTrees((t) => t.map((tree) => (tree.id === id ? { ...tree, ...patch } : tree)));
+        const safePatch = 'photo' in patch ? { ...patch, photo: internPhoto(patch.photo) } : patch;
+        setTrees((t) => t.map((tree) => (tree.id === id ? { ...tree, ...safePatch } : tree)));
     }, []);
 
     const deleteTree: BonsaiContextValue['deleteTree'] = useCallback((id) => {
-        setTrees((t) => t.filter((tree) => tree.id !== id));
+        setTrees((t) => {
+            t.filter((tree) => tree.id === id).flatMap(photoRefs).forEach(removePhoto);
+
+            return t.filter((tree) => tree.id !== id);
+        });
         setCustomTasks((c) => c.filter((task) => task.treeId !== id));
     }, []);
 
     const addProgress: BonsaiContextValue['addProgress'] = useCallback((treeId, entry) => {
+        const photo = internPhoto(entry.photo);
         setTrees((t) =>
             t.map((tree) =>
                 tree.id === treeId
                     ? {
                           ...tree,
-                          photo: entry.photo ?? tree.photo,
+                          photo: photo ?? tree.photo,
                           // typed entries also update the care timestamps they represent
                           lastWired: entry.kind === 'wiring' ? entry.date : tree.lastWired,
                           lastRepotted: entry.kind === 'repotting' ? entry.date : tree.lastRepotted,
-                          progress: [{ ...entry, id: uid() }, ...tree.progress]
+                          progress: [{ ...entry, photo, id: uid() }, ...tree.progress]
                       }
                     : tree
             )
