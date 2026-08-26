@@ -69,8 +69,10 @@ const MyTreesPage = () => {
                         key={key}
                         onClick={() => setFilter(key)}
                         className={cn(
-                            'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
-                            filter === key ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-card text-foreground shadow-sm'
+                            'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-[transform,background-color,color] active:scale-95',
+                            filter === key
+                                ? 'from-primary to-primary/85 text-primary-foreground shadow-primary/40 bg-gradient-to-b shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_6px_14px_-6px]'
+                                : 'bg-card text-foreground border border-black/[0.04] shadow-sm'
                         )}>
                         {label}
                     </button>

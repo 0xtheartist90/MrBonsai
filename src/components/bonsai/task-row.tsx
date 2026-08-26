@@ -96,7 +96,7 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
                                         : undefined
                                 });
                             }}
-                            className='border-border text-muted-foreground hover:text-primary flex size-9 items-center justify-center rounded-full border transition-colors'>
+                            className='bg-secondary/70 text-muted-foreground hover:text-primary hover:bg-accent flex size-9 items-center justify-center rounded-full shadow-[inset_0_1px_2px_rgb(30_35_22/0.06)] transition-colors active:scale-95'>
                             <CloudRain className='size-4' />
                         </button>
                     )}
@@ -116,7 +116,7 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
                                         : undefined
                                 });
                             }}
-                            className='border-border text-muted-foreground hover:text-destructive flex size-9 items-center justify-center rounded-full border transition-colors'>
+                            className='bg-secondary/70 text-muted-foreground hover:text-destructive flex size-9 items-center justify-center rounded-full shadow-[inset_0_1px_2px_rgb(30_35_22/0.06)] transition-colors active:scale-95'>
                             <X className='size-4' />
                         </button>
                     )}
@@ -125,7 +125,7 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
                             task.kind === 'water' ? `Mark ${tree?.name ?? 'plant'} as watered` : `Mark ${task.title} as done`
                         }
                         onClick={complete}
-                        className='border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary flex size-9 items-center justify-center rounded-full border transition-colors'>
+                        className='bg-accent text-accent-foreground hover:from-primary hover:to-primary/85 hover:text-primary-foreground flex size-9 items-center justify-center rounded-full shadow-[0_1px_2px_rgb(30_35_22/0.08)] transition-all hover:bg-gradient-to-b hover:shadow-primary/40 active:scale-95'>
                         <Check className='size-4' />
                     </button>
                 </div>
