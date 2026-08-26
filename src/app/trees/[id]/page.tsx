@@ -112,11 +112,15 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const waterTask = treeTasks.find((t) => t.kind === 'water');
     const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
     const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
-    const lastPrunedEntry = [...tree.progress]
-        .filter((p) => p.kinds?.includes('pruning'))
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .at(-1);
+    const entriesOfKind = (kind: ProgressKind) =>
+        [...tree.progress].filter((p) => p.kinds?.includes(kind)).sort((a, b) => b.date.localeCompare(a.date));
+
+    const pruningHistory = entriesOfKind('pruning');
+    const wiringHistory = entriesOfKind('wiring');
+    const lastPrunedEntry = pruningHistory[0];
     const lastPruned = lastPrunedEntry?.date;
+    /** Timeline entries shown as pickable history inside the stat drawer */
+    const statHistory = statEditor === 'wired' ? wiringHistory : statEditor === 'pruned' ? pruningHistory : [];
 
     const today = new Date().toISOString().slice(0, 10);
 
@@ -148,9 +152,15 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
             toast.success('Repot date saved — fertilizer pause counts from this date.');
         } else if (statEditor === 'pruned') {
             const iso = new Date(`${statValue}T12:00:00`).toISOString();
-            if (lastPrunedEntry) updateProgress(tree.id, lastPrunedEntry.id, { date: iso });
-            else addProgress(tree.id, { date: iso, note: 'Pruned.', kinds: ['pruning'] });
-            toast.success('Pruning date saved to the timeline.');
+            const existing = pruningHistory.find((p) => p.date.slice(0, 10) === statValue);
+            if (existing) toast.success('That pruning is already in the timeline.');
+            else if (lastPrunedEntry) {
+                updateProgress(tree.id, lastPrunedEntry.id, { date: iso });
+                toast.success('Newest pruning entry moved to this date.');
+            } else {
+                addProgress(tree.id, { date: iso, note: 'Pruned.', kinds: ['pruning'] });
+                toast.success('Pruning added to the timeline.');
+            }
         }
         setStatEditor(null);
     };
@@ -311,6 +321,41 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                             onChange={(e) => setStatValue(e.target.value)}
                             className='bg-secondary/60 h-12 rounded-2xl border-none'
                         />
+                        {statHistory.length > 0 && (
+                            <div>
+                                <p className='text-muted-foreground mb-1.5 text-xs font-medium'>
+                                    Or pick from the timeline
+                                </p>
+                                <div className='max-h-40 space-y-1.5 overflow-y-auto'>
+                                    {statHistory.map((entry) => (
+                                        <button
+                                            key={entry.id}
+                                            onClick={() => setStatValue(entry.date.slice(0, 10))}
+                                            className={cn(
+                                                'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left',
+                                                statValue === entry.date.slice(0, 10)
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'bg-secondary/60'
+                                            )}>
+                                            <span className='text-xs font-semibold whitespace-nowrap'>
+                                                {formatDate(entry.date)}
+                                            </span>
+                                            {entry.note && (
+                                                <span
+                                                    className={cn(
+                                                        'truncate text-xs',
+                                                        statValue === entry.date.slice(0, 10)
+                                                            ? 'opacity-80'
+                                                            : 'text-muted-foreground'
+                                                    )}>
+                                                    {entry.note}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <div className='flex gap-2'>
                             <Button onClick={saveStatEditor} className='h-12 flex-1 rounded-full font-semibold'>
                                 Save
