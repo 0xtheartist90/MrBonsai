@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { PhotoInput } from '@/components/bonsai/photo-input';
 import { TaskRow } from '@/components/bonsai/task-row';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
-import { SEASON_LABEL, currentSeason, formatDate } from '@/lib/bonsai/season';
+import { SEASON_LABEL, currentSeason, daysBetween, formatDate, relativeDue } from '@/lib/bonsai/season';
 import { SPECIES, speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
 import type { ProgressKind } from '@/lib/bonsai/types';
@@ -95,6 +95,13 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const treeTasks = tasks.filter((t) => t.treeId === tree.id);
     const age = tree.birthYear ? new Date().getFullYear() - tree.birthYear : undefined;
 
+    const waterInterval = tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[season];
+    const feedInterval = tree.careOverrides?.fertilizingDays ?? species.care.fertilizingIntervalDays[season];
+    const waterTask = treeTasks.find((t) => t.kind === 'water');
+    const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
+    const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
+    const feedDueDays = feedTask ? daysBetween(new Date(), feedTask.due) : null;
+
     const saveProgress = () => {
         if (!progressNote.trim() && !progressPhoto) {
             toast.error('Add a note or a photo first.');
@@ -155,6 +162,31 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                 </div>
             </div>
 
+            <div className='grid grid-cols-2 gap-2'>
+                <ScheduleCard
+                    icon={Droplets}
+                    label='Water'
+                    rhythm={waterInterval === 1 ? 'Daily' : `Every ${waterInterval}d`}
+                    status={waterTask ? relativeDue(waterTask.due) : '—'}
+                    urgent={waterDueDays !== null && waterDueDays <= 0}
+                    onClick={() => setTab('care')}
+                />
+                <ScheduleCard
+                    icon={Leaf}
+                    label='Feed'
+                    rhythm={
+                        tree.stage === 'cutting'
+                            ? 'After rooting'
+                            : feedInterval === null
+                              ? 'Paused'
+                              : `Every ${feedInterval}d`
+                    }
+                    status={feedTask ? relativeDue(feedTask.due) : tree.stage === 'cutting' ? 'Not yet' : '—'}
+                    urgent={feedDueDays !== null && feedDueDays <= 0}
+                    onClick={() => setTab('care')}
+                />
+            </div>
+
             <div className='-mx-4 flex snap-x gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
                 <StatChip
                     icon={TreeDeciduous}
@@ -163,15 +195,15 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     onClick={() => setTab('details')}
                 />
                 <StatChip
-                    icon={Banknote}
-                    label='Paid'
-                    value={tree.purchasePrice !== undefined ? `฿${tree.purchasePrice}` : '—'}
-                    onClick={() => setTab('details')}
-                />
-                <StatChip
                     icon={Cable}
                     label='Wired'
                     value={tree.lastWired ? formatDate(tree.lastWired) : 'Not yet'}
+                    onClick={() => setTab('details')}
+                />
+                <StatChip
+                    icon={Banknote}
+                    label='Paid'
+                    value={tree.purchasePrice !== undefined ? `฿${tree.purchasePrice}` : '—'}
                     onClick={() => setTab('details')}
                 />
                 <StatChip icon={Store} label='From' value={tree.purchasedAt || '—'} onClick={() => setTab('details')} />
@@ -722,6 +754,41 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
         </div>
     );
 };
+
+const ScheduleCard = ({
+    icon: Icon,
+    label,
+    rhythm,
+    status,
+    urgent,
+    onClick
+}: {
+    icon: typeof Droplets;
+    label: string;
+    rhythm: string;
+    status: string;
+    urgent: boolean;
+    onClick: () => void;
+}) => (
+    <button
+        onClick={onClick}
+        className='bg-card flex items-center gap-3 rounded-2xl p-3 text-left shadow-sm transition-transform active:scale-[0.97]'>
+        <span
+            className={cn(
+                'flex size-11 shrink-0 items-center justify-center rounded-2xl',
+                urgent ? 'bg-destructive/10 text-destructive' : 'bg-accent text-accent-foreground'
+            )}>
+            <Icon className='size-5' strokeWidth={1.8} />
+        </span>
+        <div className='min-w-0'>
+            <p className='text-muted-foreground text-[10px] font-medium tracking-wide uppercase'>{label}</p>
+            <p className='truncate text-sm leading-tight font-bold'>{rhythm}</p>
+            <p className={cn('truncate text-[11px] font-medium', urgent ? 'text-destructive' : 'text-muted-foreground')}>
+                {status}
+            </p>
+        </div>
+    </button>
+);
 
 const StatChip = ({
     icon: Icon,
