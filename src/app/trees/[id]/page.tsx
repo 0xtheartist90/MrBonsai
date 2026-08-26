@@ -15,6 +15,13 @@ import type { ProgressKind, RepotSeverity } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { Input } from '@/registry/new-york-v4/ui/input';
+import {
+    Drawer,
+    DrawerContent,
+    DrawerDescription,
+    DrawerHeader,
+    DrawerTitle
+} from '@/registry/new-york-v4/ui/drawer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/registry/new-york-v4/ui/tabs';
 import { Textarea } from '@/registry/new-york-v4/ui/textarea';
 
@@ -75,6 +82,8 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const [addingProgress, setAddingProgress] = useState(searchParams.get('progress') === '1');
     const [editingEntry, setEditingEntry] = useState<string | null>(null);
     const [tab, setTab] = useState(searchParams.get('progress') === '1' ? 'progress' : 'care');
+    const [statEditor, setStatEditor] = useState<'age' | 'wired' | 'potted' | 'pruned' | null>(null);
+    const [statValue, setStatValue] = useState('');
 
     if (!ready) return null;
 
@@ -104,11 +113,56 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
     const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
     const feedDueDays = feedTask ? daysBetween(new Date(), feedTask.due) : null;
-    const lastPruned = tree.progress
+    const lastPrunedEntry = [...tree.progress]
         .filter((p) => p.kinds?.includes('pruning'))
-        .map((p) => p.date)
-        .sort()
+        .sort((a, b) => a.date.localeCompare(b.date))
         .at(-1);
+    const lastPruned = lastPrunedEntry?.date;
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const openStatEditor = (which: NonNullable<typeof statEditor>) => {
+        const initial = {
+            age: tree.birthYear?.toString() ?? '',
+            wired: tree.lastWired?.slice(0, 10) ?? today,
+            potted: tree.lastRepotted?.slice(0, 10) ?? today,
+            pruned: lastPruned?.slice(0, 10) ?? today
+        }[which];
+        setStatValue(initial);
+        setStatEditor(which);
+    };
+
+    const saveStatEditor = () => {
+        if (!statEditor) return;
+        if (statEditor === 'age') {
+            updateTree(tree.id, { birthYear: statValue ? Number(statValue) : undefined });
+            toast.success(statValue ? `Start year set to ${statValue}.` : 'Age cleared.');
+        } else if (!statValue) {
+            toast.error('Pick a date first.');
+
+            return;
+        } else if (statEditor === 'wired') {
+            updateTree(tree.id, { lastWired: new Date(`${statValue}T12:00:00`).toISOString() });
+            toast.success('Wiring date saved — wire check scheduled from this date.');
+        } else if (statEditor === 'potted') {
+            updateTree(tree.id, { lastRepotted: new Date(`${statValue}T12:00:00`).toISOString() });
+            toast.success('Repot date saved — fertilizer pause counts from this date.');
+        } else if (statEditor === 'pruned') {
+            const iso = new Date(`${statValue}T12:00:00`).toISOString();
+            if (lastPrunedEntry) updateProgress(tree.id, lastPrunedEntry.id, { date: iso });
+            else addProgress(tree.id, { date: iso, note: 'Pruned.', kinds: ['pruning'] });
+            toast.success('Pruning date saved to the timeline.');
+        }
+        setStatEditor(null);
+    };
+
+    const clearStatEditor = () => {
+        if (statEditor === 'wired') updateTree(tree.id, { lastWired: undefined, wireCheckedAt: undefined });
+        if (statEditor === 'potted') updateTree(tree.id, { lastRepotted: undefined });
+        if (statEditor === 'age') updateTree(tree.id, { birthYear: undefined });
+        toast.success('Cleared.');
+        setStatEditor(null);
+    };
 
     const saveProgress = () => {
         if (!progressNote.trim() && !progressPhoto) {
@@ -206,27 +260,69 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     icon={TreeDeciduous}
                     label='Age'
                     value={age === undefined ? 'Unknown' : age < 1 ? '< 1 yr' : `±${age} yrs`}
-                    onClick={() => setTab('details')}
+                    onClick={() => openStatEditor('age')}
                 />
                 <StatChip
                     icon={Cable}
                     label='Wired'
                     value={tree.lastWired ? formatDate(tree.lastWired) : 'Not yet'}
-                    onClick={() => setTab('details')}
+                    onClick={() => openStatEditor('wired')}
                 />
                 <StatChip
                     icon={Shovel}
                     label='Potted'
                     value={tree.lastRepotted ? formatDate(tree.lastRepotted) : 'Not yet'}
-                    onClick={() => setTab('details')}
+                    onClick={() => openStatEditor('potted')}
                 />
                 <StatChip
                     icon={Scissors}
                     label='Pruned'
                     value={lastPruned ? formatDate(lastPruned) : 'Not yet'}
-                    onClick={() => setTab('progress')}
+                    onClick={() => openStatEditor('pruned')}
                 />
             </div>
+
+            <Drawer open={statEditor !== null} onOpenChange={(open) => !open && setStatEditor(null)}>
+                <DrawerContent>
+                    <DrawerHeader className='text-left'>
+                        <DrawerTitle>
+                            {statEditor === 'age' && 'Estimated age'}
+                            {statEditor === 'wired' && 'Last wired'}
+                            {statEditor === 'potted' && 'Last repotted'}
+                            {statEditor === 'pruned' && 'Last pruned'}
+                        </DrawerTitle>
+                        <DrawerDescription>
+                            {statEditor === 'age' && 'The year this tree started growing — its age counts up from there.'}
+                            {statEditor === 'wired' && 'The wire check reminder counts 6 weeks from this date.'}
+                            {statEditor === 'potted' && 'Repot schedule and the fertilizer pause count from this date.'}
+                            {statEditor === 'pruned' &&
+                                (lastPrunedEntry
+                                    ? 'Updates the newest pruning entry in the timeline.'
+                                    : 'Adds a pruning entry to the timeline on this date.')}
+                        </DrawerDescription>
+                    </DrawerHeader>
+                    <div className='space-y-3 px-4 pb-8'>
+                        <Input
+                            type={statEditor === 'age' ? 'number' : 'date'}
+                            value={statValue}
+                            placeholder={statEditor === 'age' ? 'e.g. 2023' : undefined}
+                            max={statEditor === 'age' ? new Date().getFullYear() : today}
+                            onChange={(e) => setStatValue(e.target.value)}
+                            className='bg-secondary/60 h-12 rounded-2xl border-none'
+                        />
+                        <div className='flex gap-2'>
+                            <Button onClick={saveStatEditor} className='h-12 flex-1 rounded-full font-semibold'>
+                                Save
+                            </Button>
+                            {statEditor !== 'pruned' && (
+                                <Button variant='secondary' onClick={clearStatEditor} className='h-12 rounded-full'>
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </DrawerContent>
+            </Drawer>
 
             <Tabs value={tab} onValueChange={setTab}>
                 <TabsList className='bg-card h-11 w-full rounded-full p-1 shadow-sm'>
