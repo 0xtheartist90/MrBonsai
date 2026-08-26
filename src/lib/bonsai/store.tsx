@@ -197,7 +197,10 @@ interface BonsaiContextValue {
     updateTree: (id: string, patch: Partial<Tree>) => void;
     deleteTree: (id: string) => void;
     addProgress: (treeId: string, entry: Omit<ProgressEntry, 'id'>) => void;
+    updateProgress: (treeId: string, entryId: string, patch: Partial<Omit<ProgressEntry, 'id'>>) => void;
+    deleteProgress: (treeId: string, entryId: string) => void;
     addCustomTask: (task: Omit<CustomTask, 'id' | 'done'>) => void;
+    deleteCustomTask: (id: string) => void;
     completeTask: (task: CareTask) => void;
     /** Every task, one per tree — used on a tree's own page */
     tasks: CareTask[];
@@ -276,8 +279,46 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         );
     }, []);
 
+    const updateProgress: BonsaiContextValue['updateProgress'] = useCallback((treeId, entryId, patch) => {
+        const safePatch = 'photo' in patch ? { ...patch, photo: internPhoto(patch.photo) } : patch;
+        setTrees((t) =>
+            t.map((tree) =>
+                tree.id === treeId
+                    ? {
+                          ...tree,
+                          progress: tree.progress.map((entry) =>
+                              entry.id === entryId ? { ...entry, ...safePatch } : entry
+                          )
+                      }
+                    : tree
+            )
+        );
+    }, []);
+
+    const deleteProgress: BonsaiContextValue['deleteProgress'] = useCallback((treeId, entryId) => {
+        setTrees((t) =>
+            t.map((tree) => {
+                if (tree.id !== treeId) return tree;
+                const entry = tree.progress.find((p) => p.id === entryId);
+                // only remove the stored photo when no other entry or the cover still uses it
+                if (isPhotoRef(entry?.photo)) {
+                    const usedElsewhere =
+                        tree.photo === entry.photo ||
+                        tree.progress.some((p) => p.id !== entryId && p.photo === entry.photo);
+                    if (!usedElsewhere) removePhoto(entry.photo);
+                }
+
+                return { ...tree, progress: tree.progress.filter((p) => p.id !== entryId) };
+            })
+        );
+    }, []);
+
     const addCustomTask: BonsaiContextValue['addCustomTask'] = useCallback((task) => {
         setCustomTasks((c) => [...c, { ...task, id: uid(), done: false }]);
+    }, []);
+
+    const deleteCustomTask: BonsaiContextValue['deleteCustomTask'] = useCallback((id) => {
+        setCustomTasks((c) => c.filter((task) => task.id !== id));
     }, []);
 
     const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
@@ -305,7 +346,10 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         updateTree,
         deleteTree,
         addProgress,
+        updateProgress,
+        deleteProgress,
         addCustomTask,
+        deleteCustomTask,
         completeTask,
         tasks,
         agenda
@@ -361,7 +405,7 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
 
         // Repotting: due in the next spring window after the interval elapses
         const lastRepotted = tree.lastRepotted ? new Date(tree.lastRepotted) : new Date(tree.acquiredAt);
-        const repotYear = lastRepotted.getFullYear() + species.care.repotEveryYears;
+        const repotYear = lastRepotted.getFullYear() + (tree.careOverrides?.repotYears ?? species.care.repotEveryYears);
         const repotDue = new Date(repotYear, 2, 15);
         if (!isCutting && repotDue.getTime() - now.getTime() < 60 * 86_400_000) {
             tasks.push({
@@ -382,7 +426,7 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
                 treeId: tree.id,
                 title: `Check wire on ${tree.name}`,
                 detail: 'Make sure the wire is not cutting into the bark; remove or rewrap if needed.',
-                due: addDays(startOfDay(new Date(tree.lastWired)), 42)
+                due: addDays(startOfDay(new Date(tree.lastWired)), tree.careOverrides?.wireCheckDays ?? 42)
             });
         }
 

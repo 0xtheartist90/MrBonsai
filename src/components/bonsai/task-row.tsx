@@ -7,7 +7,7 @@ import { useBonsai } from '@/lib/bonsai/store';
 import type { CareTask, TaskKind } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
-import { Cable, Camera, Check, Droplets, Leaf, ListChecks, Shovel } from 'lucide-react';
+import { Cable, Camera, Check, Droplets, Leaf, ListChecks, Shovel, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const kindIcon: Record<TaskKind, typeof Droplets> = {
@@ -20,7 +20,7 @@ const kindIcon: Record<TaskKind, typeof Droplets> = {
 };
 
 export const TaskRow = ({ task }: { task: CareTask }) => {
-    const { completeTask, trees } = useBonsai();
+    const { completeTask, deleteCustomTask, trees } = useBonsai();
     const Icon = kindIcon[task.kind];
     const overdue = daysBetween(new Date(), task.due) < 0;
     const tree = trees.find((t) => t.id === task.treeId);
@@ -48,15 +48,30 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
                     {task.treeId ? 'Add photo' : 'Start'}
                 </Link>
             ) : (
-                <button
-                    aria-label={`Mark ${task.title} as done`}
-                    onClick={() => {
-                        completeTask(task);
-                        toast.success(`${task.title} — done!`);
-                    }}
-                    className='border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary flex size-9 items-center justify-center rounded-full border transition-colors'>
-                    <Check className='size-4' />
-                </button>
+                <div className='flex shrink-0 gap-1.5'>
+                    {task.customId && (
+                        <button
+                            aria-label={`Delete ${task.title}`}
+                            onClick={() => {
+                                if (confirm(`Delete the task "${task.title}"?`)) {
+                                    deleteCustomTask(task.customId!);
+                                    toast.success('Task deleted.');
+                                }
+                            }}
+                            className='border-border text-muted-foreground hover:text-destructive flex size-9 items-center justify-center rounded-full border transition-colors'>
+                            <X className='size-4' />
+                        </button>
+                    )}
+                    <button
+                        aria-label={`Mark ${task.title} as done`}
+                        onClick={() => {
+                            completeTask(task);
+                            toast.success(`${task.title} — done!`);
+                        }}
+                        className='border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary flex size-9 items-center justify-center rounded-full border transition-colors'>
+                        <Check className='size-4' />
+                    </button>
+                </div>
             )}
         </div>
     );

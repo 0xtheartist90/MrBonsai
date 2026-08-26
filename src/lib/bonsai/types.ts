@@ -51,10 +51,17 @@ export interface Tree {
     birthYear?: number;
     /** Development stage: cuttings get gentler care guidance */
     stage?: 'cutting' | 'development' | 'refinement';
-    /** Per-tree schedule overrides in days; unset fields follow the species schedule */
+    /** Free-text soil mix, e.g. "70% pumice 1-3 mm · 30% cocopeat" */
+    soilMix?: string;
+    /** Free-text fertilizer in use, e.g. "organic pellets" or "none" */
+    fertilizer?: string;
+    /** Per-tree schedule overrides; unset fields follow the species schedule */
     careOverrides?: {
         wateringDays?: number;
         fertilizingDays?: number;
+        repotYears?: number;
+        /** Days after wiring before the wire check is due (default 42) */
+        wireCheckDays?: number;
     };
     purchasePrice?: number;
     purchasedAt?: string; // shop / seller

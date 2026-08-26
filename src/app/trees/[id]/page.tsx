@@ -9,7 +9,7 @@ import { PhotoInput } from '@/components/bonsai/photo-input';
 import { TaskRow } from '@/components/bonsai/task-row';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, formatDate } from '@/lib/bonsai/season';
-import { speciesById } from '@/lib/bonsai/species';
+import { SPECIES, speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
 import type { ProgressKind } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,9 @@ import {
     Cable,
     Camera,
     Droplets,
+    Layers,
     Leaf,
+    Pencil,
     Scissors,
     Shovel,
     Sparkles,
@@ -45,6 +47,10 @@ const KIND_OPTIONS: { value: ProgressKind; label: string; icon: typeof Camera }[
     { value: 'styling', label: 'Styling', icon: Sparkles }
 ];
 
+const SOIL_COMPONENTS = ['pumice', 'akadama', 'lava', 'cocopeat', 'grit', 'potting soil', 'sphagnum', 'perlite'];
+
+const FERTILIZERS = ['organic pellets', 'liquid balanced', 'slow-release', 'biogold', 'none (rooting)'];
+
 const KIND_LABEL: Record<ProgressKind, string> = {
     note: 'Note',
     pruning: 'Pruning',
@@ -57,12 +63,13 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const { id } = use(params);
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { ready, trees, tasks, addProgress, deleteTree, updateTree } = useBonsai();
+    const { ready, trees, tasks, addProgress, updateProgress, deleteProgress, deleteTree, updateTree } = useBonsai();
 
     const [progressNote, setProgressNote] = useState('');
     const [progressPhoto, setProgressPhoto] = useState<string>();
     const [progressKind, setProgressKind] = useState<ProgressKind>('note');
     const [addingProgress, setAddingProgress] = useState(searchParams.get('progress') === '1');
+    const [editingEntry, setEditingEntry] = useState<string | null>(null);
 
     if (!ready) return null;
 
@@ -186,6 +193,14 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                         <p className='mt-1 text-sm leading-relaxed'>{species.seasonalTips[season]}</p>
                     </div>
 
+                    {(tree.soilMix || tree.fertilizer) && (
+                        <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
+                            <h2 className='font-semibold'>Your setup</h2>
+                            {tree.soilMix && <CareLine icon={Layers} title='Soil mix' text={tree.soilMix} />}
+                            {tree.fertilizer && <CareLine icon={Leaf} title='Fertilizer' text={tree.fertilizer} />}
+                        </div>
+                    )}
+
                     <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
                         <CareLine icon={Droplets} title='Watering' text={species.care.watering} />
                         <CareLine icon={Leaf} title='Fertilizing' text={species.care.fertilizing} />
@@ -272,8 +287,77 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                                     {KIND_LABEL[entry.kind]}
                                                 </span>
                                             )}
+                                            <div className='ml-auto flex gap-1'>
+                                                <button
+                                                    aria-label='Edit entry'
+                                                    onClick={() =>
+                                                        setEditingEntry(editingEntry === entry.id ? null : entry.id)
+                                                    }
+                                                    className='bg-secondary text-secondary-foreground flex size-7 items-center justify-center rounded-full'>
+                                                    <Pencil className='size-3' />
+                                                </button>
+                                                <button
+                                                    aria-label='Delete entry'
+                                                    onClick={() => {
+                                                        if (confirm('Delete this progress entry?')) {
+                                                            deleteProgress(tree.id, entry.id);
+                                                            toast.success('Entry deleted.');
+                                                        }
+                                                    }}
+                                                    className='bg-destructive/10 text-destructive flex size-7 items-center justify-center rounded-full'>
+                                                    <Trash2 className='size-3' />
+                                                </button>
+                                            </div>
                                         </div>
-                                        {entry.note && <p className='mt-1 text-sm'>{entry.note}</p>}
+                                        {editingEntry === entry.id ? (
+                                            <div className='mt-2 space-y-2'>
+                                                <div className='flex flex-wrap gap-1.5'>
+                                                    {KIND_OPTIONS.map((o) => (
+                                                        <button
+                                                            key={o.value}
+                                                            onClick={() =>
+                                                                updateProgress(tree.id, entry.id, { kind: o.value })
+                                                            }
+                                                            className={cn(
+                                                                'rounded-full px-2.5 py-1 text-[10px] font-medium',
+                                                                (entry.kind ?? 'note') === o.value
+                                                                    ? 'bg-primary text-primary-foreground'
+                                                                    : 'bg-secondary text-secondary-foreground'
+                                                            )}>
+                                                            {o.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <Textarea
+                                                    defaultValue={entry.note}
+                                                    onBlur={(e) =>
+                                                        updateProgress(tree.id, entry.id, { note: e.target.value })
+                                                    }
+                                                    className='bg-secondary/60 min-h-16 rounded-2xl border-none text-sm'
+                                                />
+                                                <div className='flex items-center justify-between'>
+                                                    <Input
+                                                        type='date'
+                                                        defaultValue={entry.date.slice(0, 10)}
+                                                        max={new Date().toISOString().slice(0, 10)}
+                                                        onBlur={(e) =>
+                                                            e.target.value &&
+                                                            updateProgress(tree.id, entry.id, {
+                                                                date: new Date(e.target.value).toISOString()
+                                                            })
+                                                        }
+                                                        className='bg-secondary/60 h-9 w-40 rounded-xl border-none text-xs'
+                                                    />
+                                                    <button
+                                                        onClick={() => setEditingEntry(null)}
+                                                        className='text-primary text-xs font-semibold'>
+                                                        Done
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            entry.note && <p className='mt-1 text-sm'>{entry.note}</p>
+                                        )}
                                     </div>
                                 </li>
                             ))}
@@ -283,6 +367,18 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
 
                 <TabsContent value='details' className='mt-4 space-y-4'>
                     <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
+                        <h2 className='font-semibold'>Cover photo</h2>
+                        <PhotoInput
+                            value={tree.photo?.startsWith('idb:') ? undefined : tree.photo}
+                            onChange={(dataUrl) => {
+                                updateTree(tree.id, { photo: dataUrl });
+                                toast.success('Cover photo updated.');
+                            }}
+                            label='Tap to replace the cover photo'
+                        />
+                    </div>
+
+                    <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
                         <h2 className='font-semibold'>Tree details</h2>
                         <Field label='Name'>
                             <Input
@@ -291,10 +387,36 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                 className='bg-secondary/60 h-11 rounded-2xl border-none'
                             />
                         </Field>
+                        <Field label='Species'>
+                            <select
+                                value={tree.speciesId}
+                                onChange={(e) => {
+                                    updateTree(tree.id, { speciesId: e.target.value });
+                                    toast.success('Species updated — care schedules now follow the new species.');
+                                }}
+                                className='bg-secondary/60 h-11 w-full rounded-2xl px-3 text-sm'>
+                                {SPECIES.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name} ({s.latin})
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
                         <Field label='Location'>
                             <Input
                                 defaultValue={tree.location}
                                 onBlur={(e) => updateTree(tree.id, { location: e.target.value.trim() })}
+                                className='bg-secondary/60 h-11 rounded-2xl border-none'
+                            />
+                        </Field>
+                        <Field label='In your care since'>
+                            <Input
+                                type='date'
+                                defaultValue={tree.acquiredAt.slice(0, 10)}
+                                onBlur={(e) =>
+                                    e.target.value &&
+                                    updateTree(tree.id, { acquiredAt: new Date(e.target.value).toISOString() })
+                                }
                                 className='bg-secondary/60 h-11 rounded-2xl border-none'
                             />
                         </Field>
@@ -404,6 +526,42 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                 />
                             </Field>
                         </div>
+                        <div className='grid grid-cols-2 gap-3'>
+                            <Field label='Repot every (years)'>
+                                <Input
+                                    type='number'
+                                    min={1}
+                                    defaultValue={tree.careOverrides?.repotYears}
+                                    placeholder={`Species: ${species.care.repotEveryYears}`}
+                                    onBlur={(e) =>
+                                        updateTree(tree.id, {
+                                            careOverrides: {
+                                                ...tree.careOverrides,
+                                                repotYears: e.target.value ? Math.max(1, Number(e.target.value)) : undefined
+                                            }
+                                        })
+                                    }
+                                    className='bg-secondary/60 h-11 rounded-2xl border-none'
+                                />
+                            </Field>
+                            <Field label='Wire check after (days)'>
+                                <Input
+                                    type='number'
+                                    min={1}
+                                    defaultValue={tree.careOverrides?.wireCheckDays}
+                                    placeholder='Default: 42'
+                                    onBlur={(e) =>
+                                        updateTree(tree.id, {
+                                            careOverrides: {
+                                                ...tree.careOverrides,
+                                                wireCheckDays: e.target.value ? Math.max(1, Number(e.target.value)) : undefined
+                                            }
+                                        })
+                                    }
+                                    className='bg-secondary/60 h-11 rounded-2xl border-none'
+                                />
+                            </Field>
+                        </div>
                         <p className='text-muted-foreground text-xs'>
                             Now watering every{' '}
                             <span className='text-foreground font-semibold'>
@@ -425,6 +583,94 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                             )}
                             .
                         </p>
+                    </div>
+
+                    <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
+                        <div>
+                            <h2 className='font-semibold'>Soil & feeding</h2>
+                            <p className='text-muted-foreground mt-0.5 text-xs leading-relaxed'>
+                                What this tree is actually potted in and fed with — tap a component to add it, or type
+                                freely (e.g. “70% pumice 1-3 mm · 30% cocopeat”).
+                            </p>
+                        </div>
+                        <Field label='Soil mix'>
+                            <Input
+                                key={`soil-${tree.soilMix ?? ''}`}
+                                defaultValue={tree.soilMix}
+                                placeholder='e.g. 70% pumice 1-3 mm · 30% cocopeat'
+                                onBlur={(e) => updateTree(tree.id, { soilMix: e.target.value.trim() || undefined })}
+                                className='bg-secondary/60 h-11 rounded-2xl border-none'
+                            />
+                        </Field>
+                        <div className='flex flex-wrap gap-1.5'>
+                            {SOIL_COMPONENTS.map((component) => (
+                                <button
+                                    key={component}
+                                    onClick={() =>
+                                        updateTree(tree.id, {
+                                            soilMix: tree.soilMix ? `${tree.soilMix} · ${component}` : component
+                                        })
+                                    }
+                                    className='bg-secondary text-secondary-foreground rounded-full px-2.5 py-1 text-[11px] font-medium'>
+                                    + {component}
+                                </button>
+                            ))}
+                        </div>
+                        <Field label='Fertilizer used'>
+                            <Input
+                                key={`fert-${tree.fertilizer ?? ''}`}
+                                defaultValue={tree.fertilizer}
+                                placeholder='e.g. organic pellets · liquid 2-4 weekly · none'
+                                onBlur={(e) => updateTree(tree.id, { fertilizer: e.target.value.trim() || undefined })}
+                                className='bg-secondary/60 h-11 rounded-2xl border-none'
+                            />
+                        </Field>
+                        <div className='flex flex-wrap gap-1.5'>
+                            {FERTILIZERS.map((f) => (
+                                <button
+                                    key={f}
+                                    onClick={() =>
+                                        updateTree(tree.id, {
+                                            fertilizer: tree.fertilizer ? `${tree.fertilizer} · ${f}` : f
+                                        })
+                                    }
+                                    className='bg-secondary text-secondary-foreground rounded-full px-2.5 py-1 text-[11px] font-medium'>
+                                    + {f}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
+                        <div>
+                            <h2 className='font-semibold'>Care history</h2>
+                            <p className='text-muted-foreground mt-0.5 text-xs leading-relaxed'>
+                                All reminders count from these dates — correct them here if you cared for the tree
+                                without ticking a task.
+                            </p>
+                        </div>
+                        <div className='grid grid-cols-2 gap-3'>
+                            <DateField
+                                label='Last watered'
+                                value={tree.lastWatered}
+                                onChange={(iso) => updateTree(tree.id, { lastWatered: iso })}
+                            />
+                            <DateField
+                                label='Last fertilized'
+                                value={tree.lastFertilized}
+                                onChange={(iso) => updateTree(tree.id, { lastFertilized: iso })}
+                            />
+                            <DateField
+                                label='Last repotted'
+                                value={tree.lastRepotted}
+                                onChange={(iso) => updateTree(tree.id, { lastRepotted: iso })}
+                            />
+                            <DateField
+                                label='Last wired'
+                                value={tree.lastWired}
+                                onChange={(iso) => updateTree(tree.id, { lastWired: iso })}
+                            />
+                        </div>
                     </div>
 
                     <div className='bg-card rounded-3xl p-4 shadow-sm'>
@@ -459,6 +705,26 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
         <span className='text-muted-foreground mb-1 block text-xs font-medium'>{label}</span>
         {children}
     </label>
+);
+
+const DateField = ({
+    label,
+    value,
+    onChange
+}: {
+    label: string;
+    value?: string;
+    onChange: (iso: string | undefined) => void;
+}) => (
+    <Field label={label}>
+        <Input
+            type='date'
+            defaultValue={value?.slice(0, 10)}
+            max={new Date().toISOString().slice(0, 10)}
+            onBlur={(e) => onChange(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+            className='bg-secondary/60 h-11 rounded-2xl border-none'
+        />
+    </Field>
 );
 
 const CareLine = ({ icon: Icon, title, text }: { icon: typeof Droplets; title: string; text: string }) => (
