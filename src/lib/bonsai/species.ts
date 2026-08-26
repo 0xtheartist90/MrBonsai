@@ -470,4 +470,211 @@ SPECIES.push(
     }
 );
 
+// New collection — August 2026 (see public/new_bonsai_plant_knowledge_aug_2026.md)
+SPECIES.push(
+    {
+        id: 'chinese-fringe',
+        name: 'Chinese Fringe Tree',
+        latin: 'Chionanthus retusus Lindl. & Paxton',
+        placement: 'outdoor',
+        difficulty: 'advanced',
+        leafType: 'broadleaf',
+        evergreen: false,
+        flowers: true,
+        description:
+            'Temperate deciduous tree from East Asia with white fringe-like spring flowers. Needs a seasonal cycle, so in a tropical climate it is a watchlist plant: dormancy may be inadequate and flowering unreliable. Not the same as Chinese Fringe Flower (Loropetalum).',
+        care: {
+            watering: 'Keep moist: water fully when the top 1-2 cm starts to feel slightly dry, never bone dry. Less in the leafless period, but never let roots desiccate.',
+            wateringIntervalDays: { spring: 1, summer: 2, autumn: 2, winter: 2 },
+            fertilizing: 'Balanced feed every 2-4 weeks in active growth; avoid nitrogen-heavy feeding just before flowering.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 21, winter: 30 },
+            repotting: 'Every 2-3 years while young, in the coolest period just before bud burst.',
+            repotEveryYears: 2,
+            pruning: 'Structural work in dormancy or right after flowering — pruning before bloom removes the flower buds. Clip-and-grow for ramification.',
+            sunlight: '4-6+ hours of direct sun; afternoon protection during extreme tropical heat.',
+            temperature: 'Temperate (USDA 5-9); needs seasonal cooling — tropical fit low to medium'
+        },
+        seasonalTips: {
+            spring: 'Hot season: shade the pot from extreme afternoon heat and check moisture daily.',
+            summer: 'Rainy season: keep drainage perfect and airflow high against mildew.',
+            autumn: 'Feed moderately and let it slow down naturally.',
+            winter: 'Cool season is its rest: reduce water, do structural pruning.'
+        }
+    },
+    {
+        id: 'dragon-juniper',
+        name: 'Dragon Juniper',
+        latin: "Juniperus chinensis 'Kaizuka'",
+        placement: 'outdoor',
+        difficulty: 'intermediate',
+        leafType: 'scale',
+        evergreen: true,
+        flowers: false,
+        description:
+            '"Dragon Pine" — not a true pine but the twisting Kaizuka form of Chinese Juniper (Hollywood Juniper). Better heat tolerance than most temperate conifers, but still: outdoor full sun only, maximum root oxygen, never permanently wet.',
+        care: {
+            watering: 'Let the upper substrate clearly begin drying, then water to runoff. Overwatering is the main killer — a juniper can stay green for weeks after root damage.',
+            wateringIntervalDays: { spring: 2, summer: 3, autumn: 3, winter: 3 },
+            fertilizing: 'Balanced feed regularly but not excessively during active growth.',
+            fertilizingIntervalDays: { spring: 21, summer: 30, autumn: 21, winter: 30 },
+            repotting: 'Every 2-3 years while young; never bare-root the whole tree.',
+            repotEveryYears: 2,
+            pruning: 'No hedge-shearing, no pinching every tip: prune selectively to side shoots and NEVER strip a wanted branch of all green — bare juniper wood rarely back-buds.',
+            sunlight: 'Outdoor full sun, 6+ hours — never a permanent indoor tree.',
+            temperature: 'Temperate with useful heat tolerance; protect roots from pot heat'
+        },
+        seasonalTips: {
+            spring: 'Hot season: shield the pot from overheating; do not compensate heat with wet soil.',
+            summer: 'Rainy season is the danger zone: maximum airflow and drainage, watch for tip blight.',
+            autumn: 'Prime wiring season — its twisting habit rewards bold but staged bends.',
+            winter: 'Cool season rest; full sun all day.'
+        }
+    },
+    {
+        id: 'orange-jasmine',
+        name: 'Orange Jasmine',
+        latin: 'Murraya paniculata (L.) Jack',
+        placement: 'outdoor',
+        difficulty: 'beginner',
+        leafType: 'broadleaf',
+        evergreen: true,
+        flowers: true,
+        description:
+            'Tropical evergreen (Kamuning) with glossy compound leaves, intensely fragrant white flowers and red berries. Citrus family, excellent tropical fit and an excellent bonsai subject.',
+        care: {
+            watering: 'Let the upper 1-2 cm begin drying, then water thoroughly. No constant saturation, no severe drought, no surface-only splashes.',
+            wateringIntervalDays: { spring: 1, summer: 2, autumn: 2, winter: 2 },
+            fertilizing: 'Regular balanced or citrus-type feed with micronutrients during active growth.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 14, winter: 30 },
+            repotting: 'Every 1-2 years while young and vigorous, in warm active growth.',
+            repotEveryYears: 1,
+            pruning: 'Clip-and-grow; if the fragrant flowers matter, prune right after a bloom instead of before one.',
+            sunlight: 'Full sun to partial shade; several hours direct sun for compact growth and flowers.',
+            temperature: 'Tropical/subtropical; protect from cold'
+        },
+        seasonalTips: {
+            spring: 'Hot season: daily checks; recently repotted trees get afternoon protection.',
+            summer: 'Rainy season: strong growth and repeat flowering — trim after each flush.',
+            autumn: 'Keep feeding; check wire, branches thicken fast.',
+            winter: 'Cool season: slightly less water, enjoy the fragrance.'
+        }
+    },
+    {
+        id: 'triangle-fig',
+        name: 'Triangle Fig',
+        latin: 'Ficus natalensis subsp. leprieurii (syn. F. triangularis)',
+        placement: 'outdoor',
+        difficulty: 'beginner',
+        leafType: 'broadleaf',
+        evergreen: true,
+        flowers: false,
+        description:
+            'Tropical fig with unmistakable triangular leaves. Sold as Ficus triangularis; Kew places it under Ficus natalensis subsp. leprieurii. Can build aerial roots in humid warmth. Mind the milky latex when pruning.',
+        care: {
+            watering: 'Water when the upper layer feels slightly dry. Leaf drop after a move or root work is normal — check the soil before reaching for the watering can.',
+            wateringIntervalDays: { spring: 1, summer: 2, autumn: 2, winter: 2 },
+            fertilizing: 'Regular balanced feed; generous during trunk development.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 14, winter: 30 },
+            repotting: 'Every 1-2 years while young, in warm active growth.',
+            repotEveryYears: 1,
+            pruning: 'Clip-and-grow back to 2-3 nodes. No routine full defoliation — selective leaf removal on strong trees only.',
+            sunlight: 'Bright outdoor light with morning sun; several hours direct sun after acclimating.',
+            temperature: 'Tropical; protect from prolonged cold'
+        },
+        seasonalTips: {
+            spring: 'Hot season: fast-draining pots can dry in hours — check daily.',
+            summer: 'Rainy season humidity can trigger aerial roots; keep them moist until they reach soil.',
+            autumn: 'Strong growth: wire now but check often, Ficus swells around wire quickly.',
+            winter: 'Cool season: growth eases; a good moment for structural choices.'
+        }
+    },
+    {
+        id: 'red-maple',
+        name: 'Red Maple',
+        latin: 'Acer rubrum L.',
+        placement: 'outdoor',
+        difficulty: 'advanced',
+        leafType: 'broadleaf',
+        evergreen: false,
+        flowers: true,
+        description:
+            'True North American Red Maple — the highest climate risk in the collection for a hot tropical lowland: it needs real winter dormancy. ID note: if the leaves are deeply hand-like it may actually be a red Acer palmatum cultivar.',
+        care: {
+            watering: 'Keep the rootball moist during leaf growth — water before it dries out, daily checks in heat. Less when leafless, never desiccated.',
+            wateringIntervalDays: { spring: 1, summer: 1, autumn: 2, winter: 2 },
+            fertilizing: 'Moderate balanced feed in active growth; no excess nitrogen on refined trees.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 21, winter: null },
+            repotting: 'Every 1-2 years while young, at bud swell in the coolest period.',
+            repotEveryYears: 1,
+            pruning: 'Structural work while dormant; thin bark scars easily, so sharp clean tools and gentle wire.',
+            sunlight: 'Strong morning sun, afternoon shade in heat; keep the roots cool.',
+            temperature: 'Temperate — needs dormancy; alkaline soil causes chlorosis (target pH 5.0-6.8)'
+        },
+        seasonalTips: {
+            spring: 'Hot season: leaf scorch danger — morning sun only, roots shaded, water before it wilts.',
+            summer: 'Rainy season: drainage and airflow against fungus; do not confuse heat-induced leaf loss with dormancy.',
+            autumn: 'Hope for colour; reduce feeding as it slows.',
+            winter: 'Cool season is its only rest here — the cooler the spot, the better.'
+        }
+    },
+    {
+        id: 'ixora',
+        name: 'Ixora (Dok Khem)',
+        latin: 'Ixora coccinea L.',
+        placement: 'outdoor',
+        difficulty: 'beginner',
+        leafType: 'broadleaf',
+        evergreen: true,
+        flowers: true,
+        description:
+            'Thai ดอกเข็ม — a wet-tropical shrub native to Thailand with dense clusters of tubular flowers. Key care point: it insists on acidic, airy soil; alkaline water or substrate causes chlorosis.',
+        care: {
+            watering: 'Water when the upper 1-2 cm begins drying; no complete drought, no waterlogging.',
+            wateringIntervalDays: { spring: 1, summer: 2, autumn: 2, winter: 2 },
+            fertilizing: 'Balanced feed with micronutrients; use acid-loving fertilizer if leaves yellow with green veins.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 14, winter: 30 },
+            repotting: 'Every 1-2 years while young in warm active growth; no aggressive bare-rooting.',
+            repotEveryYears: 1,
+            pruning: 'Flowers form on shoot tips, so hard pruning removes them: prune after a flowering flush, then let selected tips mature.',
+            sunlight: 'Full sun after acclimating gives the best flowering; light shade in the fiercest afternoon heat.',
+            temperature: 'Wet tropical; keep soil acidic (pH 5.0-6.5)'
+        },
+        seasonalTips: {
+            spring: 'Hot season: full sun but daily water checks for nonstop flowering.',
+            summer: 'Rainy season: airflow against leaf spot; check soil pH if leaves yellow.',
+            autumn: 'Trim after each flower flush to keep the crown dense.',
+            winter: 'Cool season: still flowering — keep it in the sun.'
+        }
+    },
+    {
+        id: 'sweet-orange',
+        name: 'Sweet Orange',
+        latin: 'Citrus × sinensis (L.) Osbeck',
+        placement: 'outdoor',
+        difficulty: 'intermediate',
+        leafType: 'broadleaf',
+        evergreen: true,
+        flowers: true,
+        description:
+            'Evergreen citrus with fragrant white flowers and orange fruit; often grafted. A heavy feeder that wants full sun. ID note: small fruit could mean calamondin, mandarin or kumquat instead.',
+        care: {
+            watering: 'Water deeply when the upper layer begins to dry while the core still holds moisture. Never standing water, never repeatedly bone dry.',
+            wateringIntervalDays: { spring: 1, summer: 2, autumn: 2, winter: 2 },
+            fertilizing: 'Heavy feeder: complete citrus fertilizer with magnesium, iron, manganese and zinc, regularly through active growth.',
+            fertilizingIntervalDays: { spring: 14, summer: 14, autumn: 14, winter: 30 },
+            repotting: 'Every 2-3 years in warm active growth; citrus hates suffocated roots.',
+            repotEveryYears: 2,
+            pruning: 'Remove rootstock suckers below the graft, dead wood and crossing branches; clip-and-grow for refinement. Thin excess fruit on young trees.',
+            sunlight: 'Full sun, 6-8+ hours.',
+            temperature: 'Subtropical/tropical; dislikes frost'
+        },
+        seasonalTips: {
+            spring: 'Hot season: daily water checks; blossom time — enjoy the fragrance.',
+            summer: 'Rainy season: watch for root rot and leafminer damage on fresh flushes.',
+            autumn: 'Fruit development pulls energy — feed completely, thin if the tree is young.',
+            winter: 'Cool season: fruit colours up; slightly less water.'
+        }
+    }
+);
+
 export const speciesById = (id: string): Species | undefined => SPECIES.find((s) => s.id === id);
