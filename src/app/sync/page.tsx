@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 
 const SyncPage = () => {
     const router = useRouter();
-    const { syncStatus, syncSignIn, syncSignOut } = useBonsai();
+    const { syncStatus, syncSignIn, syncSignOut, syncPushNow, syncPullNow } = useBonsai();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [busy, setBusy] = useState(false);
@@ -107,6 +107,34 @@ const SyncPage = () => {
                         Every change on this device is saved to the cloud, and other signed-in devices pick it up when
                         they open the app. Photos upload automatically and download on demand.
                     </p>
+                    <div className='flex flex-wrap gap-2'>
+                        <Button
+                            variant='secondary'
+                            onClick={() => {
+                                void syncPullNow().then(() => toast.success('Pulled the latest from the cloud.'));
+                            }}
+                            className='h-11 rounded-full'>
+                            Pull latest
+                        </Button>
+                        <Button
+                            variant='secondary'
+                            onClick={() => {
+                                if (
+                                    confirm(
+                                        "Upload THIS device's collection as the newest version? Other devices will adopt it."
+                                    )
+                                ) {
+                                    void syncPushNow().then((ok) =>
+                                        ok
+                                            ? toast.success('This device is now the source of truth in the cloud.')
+                                            : toast.error('Upload failed — try again.')
+                                    );
+                                }
+                            }}
+                            className='h-11 rounded-full'>
+                            Upload this device&apos;s version
+                        </Button>
+                    </div>
                     <Button variant='secondary' onClick={() => void syncSignOut()} className='h-11 rounded-full'>
                         Sign out on this device
                     </Button>

@@ -362,6 +362,10 @@ interface BonsaiContextValue {
     syncStatus: SyncStatus;
     syncSignIn: (email: string, password: string) => Promise<string | null>;
     syncSignOut: () => Promise<void>;
+    /** Stamp this device's collection as newest and push it to the cloud */
+    syncPushNow: () => Promise<boolean>;
+    /** Fetch the cloud state and adopt it when newer */
+    syncPullNow: () => Promise<void>;
 }
 
 /** Runs the migration chain over a persisted state, wherever it came from */
@@ -415,6 +419,10 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncConfigured ? 'signedOut' : 'off');
     const localUpdatedAtRef = useRef<string | undefined>(undefined);
     const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Loading and adopting cloud state also set React state; those must NOT count as
+    // local edits — stamping them as "newest" would push stale data over the cloud.
+    const suppressNextPersistRef = useRef(true);
+    const lastPullAtRef = useRef(0);
 
     /** Adopt cloud state when it is newer than what this device has */
     const pullFromCloud = useCallback(async () => {
@@ -423,11 +431,13 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
 
             return;
         }
+        lastPullAtRef.current = Date.now();
         setSyncStatus('syncing');
         const remote = await pullState();
         if (remote && (!localUpdatedAtRef.current || remote.updatedAt > localUpdatedAtRef.current)) {
             const state = hydrate(remote.data as PersistedState);
             localUpdatedAtRef.current = remote.updatedAt;
+            suppressNextPersistRef.current = true;
             setTrees(state.trees);
             setCustomTasks(state.customTasks);
         }
@@ -458,6 +468,26 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         if (!ready) return;
+        // hydration (initial load or adopting cloud state) is not a local edit:
+        // persist it under its existing timestamp and never push it
+        if (suppressNextPersistRef.current) {
+            suppressNextPersistRef.current = false;
+            try {
+                localStorage.setItem(
+                    STORAGE_KEY,
+                    JSON.stringify({
+                        trees,
+                        customTasks,
+                        rev: DATA_REV,
+                        updatedAt: localUpdatedAtRef.current ?? new Date().toISOString()
+                    } satisfies PersistedState)
+                );
+            } catch {
+                // storage full — keep running in memory
+            }
+
+            return;
+        }
         const updatedAt = new Date().toISOString();
         localUpdatedAtRef.current = updatedAt;
         try {
@@ -479,6 +509,22 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         }, 1500);
     }, [ready, trees, customTasks]);
 
+    // returning to the app (tab focus, phone unlock) picks up changes from other devices
+    useEffect(() => {
+        const onFocus = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (Date.now() - lastPullAtRef.current < 10_000) return;
+            void pullFromCloud();
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onFocus);
+
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onFocus);
+        };
+    }, [pullFromCloud]);
+
     const syncSignIn: BonsaiContextValue['syncSignIn'] = useCallback(
         async (email, password) => {
             const error = await syncAuthSignIn(email, password);
@@ -493,6 +539,26 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         await syncAuthSignOut();
         setSyncStatus(syncConfigured ? 'signedOut' : 'off');
     }, []);
+
+    const syncPushNow: BonsaiContextValue['syncPushNow'] = useCallback(async () => {
+        if (!(await getUserId())) return false;
+        setSyncStatus('syncing');
+        const updatedAt = new Date().toISOString();
+        localUpdatedAtRef.current = updatedAt;
+        try {
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({ trees, customTasks, rev: DATA_REV, updatedAt } satisfies PersistedState)
+            );
+        } catch {
+            // storage full — push proceeds regardless
+        }
+        const ok = await pushState({ trees, customTasks, rev: DATA_REV, updatedAt }, updatedAt);
+        setSyncStatus(ok ? 'synced' : 'error');
+        await flushPhotoUploads();
+
+        return ok;
+    }, [trees, customTasks]);
 
     const addTree: BonsaiContextValue['addTree'] = useCallback((tree) => {
         const created: Tree = { ...tree, id: uid(), progress: [], photo: internPhoto(tree.photo) };
@@ -632,7 +698,9 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         agenda,
         syncStatus,
         syncSignIn,
-        syncSignOut
+        syncSignOut,
+        syncPushNow,
+        syncPullNow: pullFromCloud
     };
 
     return <BonsaiContext.Provider value={value}>{children}</BonsaiContext.Provider>;
