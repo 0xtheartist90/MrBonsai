@@ -36,7 +36,7 @@ const FILTERS: { kind: TaskKind; label: string; icon: typeof Droplets }[] = [
 ];
 
 const GrowPage = () => {
-    const { ready, trees, tasks, agenda, waterAll } = useBonsai();
+    const { ready, trees, tasks, agenda, completeTask } = useBonsai();
     const [filter, setFilter] = useState<TaskKind | null>(null);
     const [featured, setFeatured] = useState(0);
     const season = currentSeason();
@@ -46,6 +46,7 @@ const GrowPage = () => {
     const now = new Date();
     const dueTasks = agenda.filter((t) => daysBetween(now, t.due) <= 0);
     const shown = filter ? dueTasks.filter((t) => t.kind === filter) : dueTasks;
+    const dueWater = dueTasks.filter((t) => t.kind === 'water');
 
     const needsAttention = trees
         .map((tree) => ({ tree, urgency: treeUrgency(tasks, tree.id, now) }))
@@ -207,14 +208,18 @@ const GrowPage = () => {
                 <div className='mb-2 flex items-center justify-between'>
                     <h2 className='font-semibold'>{filter ? `${FILTERS.find((f) => f.kind === filter)?.label} tasks` : 'Today’s care'}</h2>
                     <div className='flex items-center gap-3'>
-                        <button
-                            onClick={() => {
-                                waterAll();
-                                toast.success(`All ${trees.length} plants marked as watered.`);
-                            }}
-                            className='bg-accent text-accent-foreground flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold'>
-                            <Droplets className='size-3.5' /> Watered all
-                        </button>
+                        {dueWater.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    dueWater.forEach(completeTask);
+                                    toast.success(
+                                        `${dueWater.length} ${dueWater.length === 1 ? 'plant' : 'plants'} marked as watered — the rest stay on their own rhythm.`
+                                    );
+                                }}
+                                className='bg-accent text-accent-foreground flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold'>
+                                <Droplets className='size-3.5' /> Watered the {dueWater.length} due
+                            </button>
+                        )}
                         <Link href='/tasks' className='text-primary flex items-center text-sm font-medium'>
                             All tasks <ChevronRight className='size-4' />
                         </Link>

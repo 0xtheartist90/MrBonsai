@@ -317,8 +317,6 @@ interface BonsaiContextValue {
     deleteProgress: (treeId: string, entryId: string) => void;
     addCustomTask: (task: Omit<CustomTask, 'id' | 'done'>) => void;
     deleteCustomTask: (id: string) => void;
-    /** Mark every tree as watered right now — for "I just did the whole bench" moments */
-    waterAll: () => void;
     completeTask: (task: CareTask) => void;
     /** Every task, one per tree — used on a tree's own page */
     tasks: CareTask[];
@@ -457,11 +455,6 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         setCustomTasks((c) => c.filter((task) => task.id !== id));
     }, []);
 
-    const waterAll: BonsaiContextValue['waterAll'] = useCallback(() => {
-        const now = new Date().toISOString();
-        setTrees((t) => t.map((tree) => ({ ...tree, lastWatered: now })));
-    }, []);
-
     const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
     const agenda = useMemo(() => collapsePhotoTasks(tasks), [tasks]);
 
@@ -491,7 +484,6 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         deleteProgress,
         addCustomTask,
         deleteCustomTask,
-        waterAll,
         completeTask,
         tasks,
         agenda
