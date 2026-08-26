@@ -44,8 +44,12 @@ const GrowPage = () => {
     if (!ready) return null;
 
     const now = new Date();
+    // the Feed tile covers both fertilizer products (16-16-16 and micronutrients)
+    const matchesFilter = (kind: TaskKind, task: { kind: TaskKind }) =>
+        kind === 'fertilize' ? task.kind === 'fertilize' || task.kind === 'micro' : task.kind === kind;
+
     const dueTasks = agenda.filter((t) => daysBetween(now, t.due) <= 0);
-    const shown = filter ? dueTasks.filter((t) => t.kind === filter) : dueTasks;
+    const shown = filter ? dueTasks.filter((t) => matchesFilter(filter, t)) : dueTasks;
     const dueWater = dueTasks.filter((t) => t.kind === 'water');
 
     const needsAttention = trees
@@ -75,7 +79,7 @@ const GrowPage = () => {
 
             <div className='grid grid-cols-4 gap-2'>
                 {FILTERS.map(({ kind, label, icon: Icon }) => {
-                    const count = dueTasks.filter((t) => t.kind === kind).length;
+                    const count = dueTasks.filter((t) => matchesFilter(kind, t)).length;
                     const active = filter === kind;
 
                     return (

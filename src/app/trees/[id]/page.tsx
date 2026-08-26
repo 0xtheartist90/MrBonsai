@@ -11,7 +11,7 @@ import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween, formatDate, relativeDue } from '@/lib/bonsai/season';
 import { SPECIES, speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
-import type { ProgressKind } from '@/lib/bonsai/types';
+import type { ProgressKind, RepotSeverity } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/registry/new-york-v4/ui/button';
 import { Input } from '@/registry/new-york-v4/ui/input';
@@ -21,7 +21,6 @@ import { Textarea } from '@/registry/new-york-v4/ui/textarea';
 import {
     ArrowLeft,
     BookOpen,
-    Banknote,
     Cable,
     Camera,
     Droplets,
@@ -31,7 +30,6 @@ import {
     Scissors,
     Shovel,
     Sparkles,
-    Store,
     Sun,
     Thermometer,
     TreeDeciduous,
@@ -71,6 +69,7 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const [progressNote, setProgressNote] = useState('');
     const [progressPhoto, setProgressPhoto] = useState<string>();
     const [progressKinds, setProgressKinds] = useState<ProgressKind[]>([]);
+    const [progressRepotSeverity, setProgressRepotSeverity] = useState<RepotSeverity>('light');
     const [progressDate, setProgressDate] = useState(new Date().toISOString().slice(0, 10));
     const [addingProgress, setAddingProgress] = useState(searchParams.get('progress') === '1');
     const [editingEntry, setEditingEntry] = useState<string | null>(null);
@@ -101,6 +100,11 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
     const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
     const feedDueDays = feedTask ? daysBetween(new Date(), feedTask.due) : null;
+    const lastPruned = tree.progress
+        .filter((p) => p.kinds?.includes('pruning'))
+        .map((p) => p.date)
+        .sort()
+        .at(-1);
 
     const saveProgress = () => {
         if (!progressNote.trim() && !progressPhoto) {
@@ -108,22 +112,28 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
 
             return;
         }
+        const isRepot = progressKinds.includes('repotting');
         addProgress(tree.id, {
             date: new Date(`${progressDate}T12:00:00`).toISOString(),
             note: progressNote.trim(),
             photo: progressPhoto,
-            kinds: progressKinds
+            kinds: progressKinds,
+            repotSeverity: isRepot ? progressRepotSeverity : undefined
         });
         setProgressNote('');
         setProgressPhoto(undefined);
         setProgressKinds([]);
+        setProgressRepotSeverity('light');
         setProgressDate(new Date().toISOString().slice(0, 10));
         setAddingProgress(false);
-        toast.success(
-            progressKinds.includes('wiring')
-                ? 'Wiring logged — a wire check is scheduled in 6 weeks.'
-                : 'Progress saved to the timeline.'
-        );
+        if (isRepot) {
+            const pause = { light: '±10', moderate: '±18', heavy: '±24' }[progressRepotSeverity];
+            toast.success(`Repot logged. BStart today per label; fertilizer pauses ${pause} days.`, { duration: 6000 });
+        } else if (progressKinds.includes('wiring')) {
+            toast.success('Wiring logged — a wire check is scheduled in 6 weeks.');
+        } else {
+            toast.success('Progress saved to the timeline.');
+        }
     };
 
     return (
@@ -187,7 +197,7 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                 />
             </div>
 
-            <div className='-mx-4 flex snap-x gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+            <div className='grid grid-cols-2 gap-2'>
                 <StatChip
                     icon={TreeDeciduous}
                     label='Age'
@@ -201,12 +211,17 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     onClick={() => setTab('details')}
                 />
                 <StatChip
-                    icon={Banknote}
-                    label='Paid'
-                    value={tree.purchasePrice !== undefined ? `฿${tree.purchasePrice}` : '—'}
+                    icon={Shovel}
+                    label='Potted'
+                    value={tree.lastRepotted ? formatDate(tree.lastRepotted) : 'Not yet'}
                     onClick={() => setTab('details')}
                 />
-                <StatChip icon={Store} label='From' value={tree.purchasedAt || '—'} onClick={() => setTab('details')} />
+                <StatChip
+                    icon={Scissors}
+                    label='Pruned'
+                    value={lastPruned ? formatDate(lastPruned) : 'Not yet'}
+                    onClick={() => setTab('progress')}
+                />
             </div>
 
             <Tabs value={tab} onValueChange={setTab}>
@@ -284,6 +299,35 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                     ))}
                                 </div>
                             </div>
+                            {progressKinds.includes('repotting') && (
+                                <div className='bg-accent/50 space-y-1.5 rounded-2xl p-3'>
+                                    <p className='text-xs font-medium'>How much root work?</p>
+                                    <div className='flex gap-1.5'>
+                                        {(
+                                            [
+                                                ['light', 'Light (<20%)'],
+                                                ['moderate', 'Moderate (20-40%)'],
+                                                ['heavy', 'Heavy (>40%)']
+                                            ] as [RepotSeverity, string][]
+                                        ).map(([value, label]) => (
+                                            <button
+                                                key={value}
+                                                onClick={() => setProgressRepotSeverity(value)}
+                                                className={cn(
+                                                    'rounded-full px-2.5 py-1.5 text-[11px] font-medium',
+                                                    progressRepotSeverity === value
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'bg-card text-foreground'
+                                                )}>
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className='text-muted-foreground text-[11px]'>
+                                        Fertilizer pauses automatically; BStart today per the label.
+                                    </p>
+                                </div>
+                            )}
                             <PhotoInput
                                 value={progressPhoto}
                                 onChange={setProgressPhoto}

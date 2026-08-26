@@ -39,6 +39,8 @@ export interface ProgressEntry {
     kind?: ProgressKind;
     /** Work done in this entry; empty/absent = plain note */
     kinds?: ProgressKind[];
+    /** How much root work a repotting entry involved — drives the fertilizer pause */
+    repotSeverity?: RepotSeverity;
 }
 
 export interface Tree {
@@ -70,12 +72,18 @@ export interface Tree {
     purchasedAt?: string; // shop / seller
     lastWatered?: string;
     lastFertilized?: string;
+    /** Last Nic-Spray EDTA micronutrient application */
+    lastMicronutrients?: string;
     lastRepotted?: string;
+    /** Root work severity of the last repot — sets how long fertilizer stays paused */
+    lastRepotSeverity?: RepotSeverity;
     lastWired?: string;
     wireCheckedAt?: string;
 }
 
-export type TaskKind = 'water' | 'fertilize' | 'repot' | 'photo' | 'wirecheck' | 'custom';
+export type TaskKind = 'water' | 'fertilize' | 'micro' | 'repot' | 'photo' | 'wirecheck' | 'custom';
+
+export type RepotSeverity = 'light' | 'moderate' | 'heavy';
 
 export interface CustomTask {
     id: string;

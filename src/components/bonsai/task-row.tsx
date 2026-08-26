@@ -7,12 +7,13 @@ import { useBonsai } from '@/lib/bonsai/store';
 import type { CareTask, TaskKind } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
-import { Cable, Camera, Check, Droplets, Leaf, ListChecks, Shovel, X } from 'lucide-react';
+import { Cable, Camera, Check, Droplets, FlaskConical, Leaf, ListChecks, Shovel, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const kindIcon: Record<TaskKind, typeof Droplets> = {
     water: Droplets,
     fertilize: Leaf,
+    micro: FlaskConical,
     repot: Shovel,
     photo: Camera,
     wirecheck: Cable,

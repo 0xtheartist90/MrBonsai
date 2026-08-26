@@ -406,6 +406,9 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                           // typed entries also update the care timestamps they represent
                           lastWired: entry.kinds?.includes('wiring') ? entry.date : tree.lastWired,
                           lastRepotted: entry.kinds?.includes('repotting') ? entry.date : tree.lastRepotted,
+                          lastRepotSeverity: entry.kinds?.includes('repotting')
+                              ? (entry.repotSeverity ?? 'moderate')
+                              : tree.lastRepotSeverity,
                           progress: [{ ...entry, photo, id: uid() }, ...tree.progress]
                       }
                     : tree
@@ -468,6 +471,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         if (!task.treeId) return;
         if (task.kind === 'water') updateTree(task.treeId, { lastWatered: nowIso });
         if (task.kind === 'fertilize') updateTree(task.treeId, { lastFertilized: nowIso });
+        if (task.kind === 'micro') updateTree(task.treeId, { lastMicronutrients: nowIso });
         if (task.kind === 'repot') updateTree(task.treeId, { lastRepotted: nowIso });
         if (task.kind === 'wirecheck') updateTree(task.treeId, { wireCheckedAt: nowIso });
     }, [updateTree]);
@@ -524,6 +528,14 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
         // Cuttings: no feeding or repotting until rooted — only watering and photo reminders
         const isCutting = tree.stage === 'cutting';
 
+        // Fertilizer pauses after root work (see public/fertilizer_schedule_app_logic.md):
+        // NPK light 7-14d / moderate 14-21d / heavy 21-28d; micronutrients 14/18/21d
+        const severity = tree.lastRepotSeverity ?? 'moderate';
+        const npkPauseDays = { light: 10, moderate: 18, heavy: 24 }[severity];
+        const microPauseDays = { light: 14, moderate: 18, heavy: 21 }[severity];
+        const lastRepot = tree.lastRepotted ? startOfDay(new Date(tree.lastRepotted)) : null;
+        const later = (a: Date, b: Date | null): Date => (b && b > a ? b : a);
+
         const feedInterval = tree.careOverrides?.fertilizingDays ?? species.care.fertilizingIntervalDays[season];
         if (feedInterval !== null && !isCutting) {
             // never fertilized: count from acquisition — a fresh (often just-repotted) plant should not be fed on day one
@@ -532,9 +544,25 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
                 key: `fertilize-${tree.id}`,
                 kind: 'fertilize',
                 treeId: tree.id,
-                title: `Fertilize ${tree.name}`,
-                detail: species.care.fertilizing,
-                due: addDays(startOfDay(lastFed), feedInterval)
+                title: `Feed ${tree.name} · 16-16-16`,
+                detail: 'Multitech slow-release, label dosage. Only feed a healthy, actively growing tree.',
+                due: later(addDays(startOfDay(lastFed), feedInterval), lastRepot && addDays(lastRepot, npkPauseDays))
+            });
+        }
+
+        // Nic-Spray EDTA micronutrients: every 4-6 weeks on established plants, never on cuttings
+        if (!isCutting) {
+            // never applied: due from today, not retroactively overdue since acquisition
+            const lastMicro = tree.lastMicronutrients
+                ? new Date(tree.lastMicronutrients)
+                : new Date(Math.max(new Date(tree.acquiredAt).getTime(), addDays(now, -35).getTime()));
+            tasks.push({
+                key: `micro-${tree.id}`,
+                kind: 'micro',
+                treeId: tree.id,
+                title: `Micronutrients ${tree.name}`,
+                detail: 'Nic-Spray EDTA, label dilution. If leaves yellow with green veins, check pH and roots first.',
+                due: later(addDays(startOfDay(lastMicro), 35), lastRepot && addDays(lastRepot, microPauseDays))
             });
         }
 
