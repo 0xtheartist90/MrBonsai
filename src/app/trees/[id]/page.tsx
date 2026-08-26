@@ -112,7 +112,6 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const waterTask = treeTasks.find((t) => t.kind === 'water');
     const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
     const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
-    const feedDueDays = feedTask ? daysBetween(new Date(), feedTask.due) : null;
     const lastPrunedEntry = [...tree.progress]
         .filter((p) => p.kinds?.includes('pruning'))
         .sort((a, b) => a.date.localeCompare(b.date))
@@ -232,6 +231,14 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
 
             <div className='grid grid-cols-2 gap-2'>
                 <ScheduleCard
+                    icon={TreeDeciduous}
+                    label='Age'
+                    rhythm={age === undefined ? 'Unknown' : age < 1 ? '< 1 yr' : `±${age} yrs`}
+                    status={tree.birthYear ? `Since ±${tree.birthYear}` : 'Tap to set'}
+                    urgent={false}
+                    onClick={() => openStatEditor('age')}
+                />
+                <ScheduleCard
                     icon={Droplets}
                     label='Water'
                     rhythm={waterInterval === 1 ? 'Daily' : `Every ${waterInterval}d`}
@@ -239,28 +246,14 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     urgent={waterDueDays !== null && waterDueDays <= 0}
                     onClick={() => setTab('care')}
                 />
-                <ScheduleCard
-                    icon={Leaf}
-                    label='Feed'
-                    rhythm={
-                        tree.stage === 'cutting'
-                            ? 'After rooting'
-                            : feedInterval === null
-                              ? 'Paused'
-                              : `Every ${feedInterval}d`
-                    }
-                    status={feedTask ? relativeDue(feedTask.due) : tree.stage === 'cutting' ? 'Not yet' : '—'}
-                    urgent={feedDueDays !== null && feedDueDays <= 0}
-                    onClick={() => setTab('care')}
-                />
             </div>
 
             <div className='grid grid-cols-2 gap-2'>
                 <StatChip
-                    icon={TreeDeciduous}
-                    label='Age'
-                    value={age === undefined ? 'Unknown' : age < 1 ? '< 1 yr' : `±${age} yrs`}
-                    onClick={() => openStatEditor('age')}
+                    icon={Shovel}
+                    label='Potted'
+                    value={tree.lastRepotted ? formatDate(tree.lastRepotted) : 'Not yet'}
+                    onClick={() => openStatEditor('potted')}
                 />
                 <StatChip
                     icon={Cable}
@@ -269,10 +262,18 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     onClick={() => openStatEditor('wired')}
                 />
                 <StatChip
-                    icon={Shovel}
-                    label='Potted'
-                    value={tree.lastRepotted ? formatDate(tree.lastRepotted) : 'Not yet'}
-                    onClick={() => openStatEditor('potted')}
+                    icon={Leaf}
+                    label='Feed'
+                    value={
+                        tree.stage === 'cutting'
+                            ? 'After rooting'
+                            : feedInterval === null
+                              ? 'Paused'
+                              : feedTask
+                                ? relativeDue(feedTask.due)
+                                : '—'
+                    }
+                    onClick={() => setTab('care')}
                 />
                 <StatChip
                     icon={Scissors}
