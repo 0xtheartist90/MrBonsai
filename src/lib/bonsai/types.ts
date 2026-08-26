@@ -35,7 +35,10 @@ export interface ProgressEntry {
     date: string; // ISO
     note: string;
     photo?: string; // data URL
+    /** Legacy single kind — migrated into `kinds` on load */
     kind?: ProgressKind;
+    /** Work done in this entry; empty/absent = plain note */
+    kinds?: ProgressKind[];
 }
 
 export interface Tree {

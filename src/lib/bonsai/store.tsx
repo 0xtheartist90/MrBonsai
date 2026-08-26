@@ -16,7 +16,10 @@ interface PersistedState {
     rev?: number;
 }
 
-const DATA_REV = 2;
+const DATA_REV = 3;
+
+/** 26 Aug 2026: the user watered the entire collection by hand */
+const WATERED_ALL_AT = '2026-08-26T10:00:00.000Z';
 
 const uid = (): string => Math.random().toString(36).slice(2, 10);
 
@@ -39,7 +42,12 @@ const internPhoto = (photo?: string): string | undefined =>
 const migrateTree = (tree: Tree): Tree => ({
     ...tree,
     photo: internPhoto(migratePhotoPath(tree.photo)),
-    progress: tree.progress.map((entry) => ({ ...entry, photo: internPhoto(migratePhotoPath(entry.photo)) }))
+    progress: tree.progress.map((entry) => ({
+        ...entry,
+        photo: internPhoto(migratePhotoPath(entry.photo)),
+        // entries used to carry a single kind; the app now works with a list
+        kinds: entry.kinds ?? (entry.kind && entry.kind !== 'note' ? [entry.kind] : [])
+    }))
 });
 
 /** Every idb photo reference a tree owns — cover and progress timeline */
@@ -309,6 +317,8 @@ interface BonsaiContextValue {
     deleteProgress: (treeId: string, entryId: string) => void;
     addCustomTask: (task: Omit<CustomTask, 'id' | 'done'>) => void;
     deleteCustomTask: (id: string) => void;
+    /** Mark every tree as watered right now — for "I just did the whole bench" moments */
+    waterAll: () => void;
     completeTask: (task: CareTask) => void;
     /** Every task, one per tree — used on a tree's own page */
     tasks: CareTask[];
@@ -329,12 +339,19 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
             if (raw) {
                 const parsed = JSON.parse(raw) as PersistedState;
                 let trees = (parsed.trees ?? []).map(migrateTree);
-                // Older saved collections predate the Aug 2026 purchases — append what's missing
-                if ((parsed.rev ?? 1) < DATA_REV) {
+                const rev = parsed.rev ?? 1;
+                // rev 2: the Aug 2026 purchases — append what's missing
+                if (rev < 2) {
                     const additions = newCollectionAug2026().filter(
                         (added) => !trees.some((t) => t.name === added.name)
                     );
                     trees = [...trees, ...additions];
+                }
+                // rev 3: the whole collection was watered on 26 Aug 2026
+                if (rev < 3) {
+                    trees = trees.map((t) =>
+                        !t.lastWatered || t.lastWatered < WATERED_ALL_AT ? { ...t, lastWatered: WATERED_ALL_AT } : t
+                    );
                 }
                 setTrees(trees);
                 setCustomTasks(parsed.customTasks ?? []);
@@ -389,8 +406,8 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                           ...tree,
                           photo: photo ?? tree.photo,
                           // typed entries also update the care timestamps they represent
-                          lastWired: entry.kind === 'wiring' ? entry.date : tree.lastWired,
-                          lastRepotted: entry.kind === 'repotting' ? entry.date : tree.lastRepotted,
+                          lastWired: entry.kinds?.includes('wiring') ? entry.date : tree.lastWired,
+                          lastRepotted: entry.kinds?.includes('repotting') ? entry.date : tree.lastRepotted,
                           progress: [{ ...entry, photo, id: uid() }, ...tree.progress]
                       }
                     : tree
@@ -440,6 +457,11 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         setCustomTasks((c) => c.filter((task) => task.id !== id));
     }, []);
 
+    const waterAll: BonsaiContextValue['waterAll'] = useCallback(() => {
+        const now = new Date().toISOString();
+        setTrees((t) => t.map((tree) => ({ ...tree, lastWatered: now })));
+    }, []);
+
     const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
     const agenda = useMemo(() => collapsePhotoTasks(tasks), [tasks]);
 
@@ -469,6 +491,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         deleteProgress,
         addCustomTask,
         deleteCustomTask,
+        waterAll,
         completeTask,
         tasks,
         agenda
@@ -511,7 +534,8 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
 
         const feedInterval = tree.careOverrides?.fertilizingDays ?? species.care.fertilizingIntervalDays[season];
         if (feedInterval !== null && !isCutting) {
-            const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : addDays(now, -feedInterval);
+            // never fertilized: count from acquisition — a fresh (often just-repotted) plant should not be fed on day one
+            const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : new Date(tree.acquiredAt);
             tasks.push({
                 key: `fertilize-${tree.id}`,
                 kind: 'fertilize',

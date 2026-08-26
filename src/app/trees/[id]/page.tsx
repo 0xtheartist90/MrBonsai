@@ -39,13 +39,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Multi-select: an entry can be repotting AND wiring at once; nothing selected = plain note
 const KIND_OPTIONS: { value: ProgressKind; label: string; icon: typeof Camera }[] = [
-    { value: 'note', label: 'Note', icon: Camera },
     { value: 'pruning', label: 'Pruning', icon: Scissors },
     { value: 'wiring', label: 'Wiring', icon: Cable },
     { value: 'repotting', label: 'Repotting', icon: Shovel },
     { value: 'styling', label: 'Styling', icon: Sparkles }
 ];
+
+const toggleKind = (kinds: ProgressKind[], kind: ProgressKind): ProgressKind[] =>
+    kinds.includes(kind) ? kinds.filter((k) => k !== kind) : [...kinds, kind];
 
 const SOIL_COMPONENTS = ['pumice', 'akadama', 'lava', 'cocopeat', 'grit', 'potting soil', 'sphagnum', 'perlite'];
 
@@ -67,9 +70,11 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
 
     const [progressNote, setProgressNote] = useState('');
     const [progressPhoto, setProgressPhoto] = useState<string>();
-    const [progressKind, setProgressKind] = useState<ProgressKind>('note');
+    const [progressKinds, setProgressKinds] = useState<ProgressKind[]>([]);
+    const [progressDate, setProgressDate] = useState(new Date().toISOString().slice(0, 10));
     const [addingProgress, setAddingProgress] = useState(searchParams.get('progress') === '1');
     const [editingEntry, setEditingEntry] = useState<string | null>(null);
+    const [tab, setTab] = useState(searchParams.get('progress') === '1' ? 'progress' : 'care');
 
     if (!ready) return null;
 
@@ -97,17 +102,18 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
             return;
         }
         addProgress(tree.id, {
-            date: new Date().toISOString(),
+            date: new Date(`${progressDate}T12:00:00`).toISOString(),
             note: progressNote.trim(),
             photo: progressPhoto,
-            kind: progressKind
+            kinds: progressKinds
         });
         setProgressNote('');
         setProgressPhoto(undefined);
-        setProgressKind('note');
+        setProgressKinds([]);
+        setProgressDate(new Date().toISOString().slice(0, 10));
         setAddingProgress(false);
         toast.success(
-            progressKind === 'wiring'
+            progressKinds.includes('wiring')
                 ? 'Wiring logged — a wire check is scheduled in 6 weeks.'
                 : 'Progress saved to the timeline.'
         );
@@ -154,17 +160,24 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     icon={TreeDeciduous}
                     label='Age'
                     value={age === undefined ? 'Unknown' : age < 1 ? '< 1 yr' : `±${age} yrs`}
+                    onClick={() => setTab('details')}
                 />
                 <StatChip
                     icon={Banknote}
                     label='Paid'
                     value={tree.purchasePrice !== undefined ? `฿${tree.purchasePrice}` : '—'}
+                    onClick={() => setTab('details')}
                 />
-                <StatChip icon={Cable} label='Wired' value={tree.lastWired ? formatDate(tree.lastWired) : 'Not yet'} />
-                <StatChip icon={Store} label='From' value={tree.purchasedAt || '—'} />
+                <StatChip
+                    icon={Cable}
+                    label='Wired'
+                    value={tree.lastWired ? formatDate(tree.lastWired) : 'Not yet'}
+                    onClick={() => setTab('details')}
+                />
+                <StatChip icon={Store} label='From' value={tree.purchasedAt || '—'} onClick={() => setTab('details')} />
             </div>
 
-            <Tabs defaultValue={addingProgress ? 'progress' : 'care'}>
+            <Tabs value={tab} onValueChange={setTab}>
                 <TabsList className='bg-card h-11 w-full rounded-full p-1 shadow-sm'>
                     <TabsTrigger value='care' className='flex-1 rounded-full'>
                         Care
@@ -219,22 +232,40 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                 <TabsContent value='progress' className='mt-4 space-y-4'>
                     {addingProgress ? (
                         <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
-                            <div className='flex flex-wrap gap-2'>
-                                {KIND_OPTIONS.map((o) => (
-                                    <button
-                                        key={o.value}
-                                        onClick={() => setProgressKind(o.value)}
-                                        className={cn(
-                                            'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                                            progressKind === o.value
-                                                ? 'bg-primary text-primary-foreground'
-                                                : 'bg-secondary text-secondary-foreground'
-                                        )}>
-                                        <o.icon className='size-3.5' /> {o.label}
-                                    </button>
-                                ))}
+                            <div>
+                                <p className='text-muted-foreground mb-1.5 text-xs font-medium'>
+                                    What did you do? Select all that apply — none selected is just a note.
+                                </p>
+                                <div className='flex flex-wrap gap-2'>
+                                    {KIND_OPTIONS.map((o) => (
+                                        <button
+                                            key={o.value}
+                                            onClick={() => setProgressKinds((k) => toggleKind(k, o.value))}
+                                            className={cn(
+                                                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                                                progressKinds.includes(o.value)
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'bg-secondary text-secondary-foreground'
+                                            )}>
+                                            <o.icon className='size-3.5' /> {o.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <PhotoInput value={progressPhoto} onChange={setProgressPhoto} label='Add a progress photo' />
+                            <PhotoInput
+                                value={progressPhoto}
+                                onChange={setProgressPhoto}
+                                label='Take a photo or pick one from your library'
+                            />
+                            <Field label='Date (e.g. when the photo was taken)'>
+                                <Input
+                                    type='date'
+                                    value={progressDate}
+                                    max={new Date().toISOString().slice(0, 10)}
+                                    onChange={(e) => e.target.value && setProgressDate(e.target.value)}
+                                    className='bg-secondary/60 h-11 rounded-2xl border-none'
+                                />
+                            </Field>
                             <Textarea
                                 value={progressNote}
                                 onChange={(e) => setProgressNote(e.target.value)}
@@ -282,11 +313,13 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                                 {formatDate(entry.date)} ·{' '}
                                                 {SEASON_LABEL[currentSeason(new Date(entry.date))]}
                                             </p>
-                                            {entry.kind && entry.kind !== 'note' && (
-                                                <span className='bg-accent text-accent-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold'>
-                                                    {KIND_LABEL[entry.kind]}
+                                            {(entry.kinds ?? []).map((k) => (
+                                                <span
+                                                    key={k}
+                                                    className='bg-accent text-accent-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold'>
+                                                    {KIND_LABEL[k]}
                                                 </span>
-                                            )}
+                                            ))}
                                             <div className='ml-auto flex gap-1'>
                                                 <button
                                                     aria-label='Edit entry'
@@ -316,11 +349,13 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                                         <button
                                                             key={o.value}
                                                             onClick={() =>
-                                                                updateProgress(tree.id, entry.id, { kind: o.value })
+                                                                updateProgress(tree.id, entry.id, {
+                                                                    kinds: toggleKind(entry.kinds ?? [], o.value)
+                                                                })
                                                             }
                                                             className={cn(
                                                                 'rounded-full px-2.5 py-1 text-[10px] font-medium',
-                                                                (entry.kind ?? 'note') === o.value
+                                                                (entry.kinds ?? []).includes(o.value)
                                                                     ? 'bg-primary text-primary-foreground'
                                                                     : 'bg-secondary text-secondary-foreground'
                                                             )}>
@@ -688,8 +723,20 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     );
 };
 
-const StatChip = ({ icon: Icon, label, value }: { icon: typeof Cable; label: string; value: string }) => (
-    <div className='bg-card flex shrink-0 snap-start items-center gap-2.5 rounded-2xl px-3.5 py-2.5 shadow-sm'>
+const StatChip = ({
+    icon: Icon,
+    label,
+    value,
+    onClick
+}: {
+    icon: typeof Cable;
+    label: string;
+    value: string;
+    onClick?: () => void;
+}) => (
+    <button
+        onClick={onClick}
+        className='bg-card flex shrink-0 snap-start items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left shadow-sm transition-transform active:scale-95'>
         <span className='bg-accent text-accent-foreground flex size-8 items-center justify-center rounded-xl'>
             <Icon className='size-4' strokeWidth={1.8} />
         </span>
@@ -697,7 +744,7 @@ const StatChip = ({ icon: Icon, label, value }: { icon: typeof Cable; label: str
             <p className='text-muted-foreground text-[10px] font-medium tracking-wide uppercase'>{label}</p>
             <p className='max-w-32 truncate text-xs font-semibold'>{value}</p>
         </div>
-    </div>
+    </button>
 );
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (

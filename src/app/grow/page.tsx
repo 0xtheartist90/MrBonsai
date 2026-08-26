@@ -13,6 +13,8 @@ import { stylingFocus, treeUrgency } from '@/lib/bonsai/urgency';
 import type { TaskKind } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
+import { toast } from 'sonner';
+
 import {
     Cable,
     Camera,
@@ -34,7 +36,7 @@ const FILTERS: { kind: TaskKind; label: string; icon: typeof Droplets }[] = [
 ];
 
 const GrowPage = () => {
-    const { ready, trees, tasks, agenda } = useBonsai();
+    const { ready, trees, tasks, agenda, waterAll } = useBonsai();
     const [filter, setFilter] = useState<TaskKind | null>(null);
     const [featured, setFeatured] = useState(0);
     const season = currentSeason();
@@ -204,9 +206,19 @@ const GrowPage = () => {
             <section>
                 <div className='mb-2 flex items-center justify-between'>
                     <h2 className='font-semibold'>{filter ? `${FILTERS.find((f) => f.kind === filter)?.label} tasks` : 'Today’s care'}</h2>
-                    <Link href='/tasks' className='text-primary flex items-center text-sm font-medium'>
-                        All tasks <ChevronRight className='size-4' />
-                    </Link>
+                    <div className='flex items-center gap-3'>
+                        <button
+                            onClick={() => {
+                                waterAll();
+                                toast.success(`All ${trees.length} plants marked as watered.`);
+                            }}
+                            className='bg-accent text-accent-foreground flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold'>
+                            <Droplets className='size-3.5' /> Watered all
+                        </button>
+                        <Link href='/tasks' className='text-primary flex items-center text-sm font-medium'>
+                            All tasks <ChevronRight className='size-4' />
+                        </Link>
+                    </div>
                 </div>
                 {shown.length === 0 ? (
                     <div className='bg-card rounded-3xl p-5 text-center shadow-sm'>

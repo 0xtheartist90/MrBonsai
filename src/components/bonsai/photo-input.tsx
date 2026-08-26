@@ -46,11 +46,11 @@ export const PhotoInput = ({
                     {label}
                 </span>
             )}
+            {/* no `capture` attribute: mobile browsers then offer both camera and photo library */}
             <input
                 ref={inputRef}
                 type='file'
                 accept='image/*'
-                capture='environment'
                 className='hidden'
                 onChange={async (e) => {
                     const file = e.target.files?.[0];
