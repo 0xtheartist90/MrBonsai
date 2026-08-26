@@ -83,9 +83,17 @@ export interface Tree {
     wireCheckedAt?: string;
     /** Last time this tree itself changed — sync merges per tree on this stamp */
     modifiedAt?: string;
+    /** Completed care actions, newest first (capped) */
+    careLog?: CareLogEntry[];
 }
 
-export type TaskKind = 'water' | 'fertilize' | 'micro' | 'repot' | 'photo' | 'wirecheck' | 'custom';
+export type TaskKind = 'water' | 'fertilize' | 'micro' | 'repot' | 'photo' | 'wirecheck' | 'rooting' | 'custom';
+
+/** One completed care action — ticking a task appends here so history is never lost */
+export interface CareLogEntry {
+    date: string; // ISO
+    kind: 'water' | 'fertilize' | 'micro' | 'repot' | 'wirecheck' | 'moist' | 'rooted';
+}
 
 export type RepotSeverity = 'light' | 'moderate' | 'heavy';
 

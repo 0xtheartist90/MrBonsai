@@ -7,7 +7,7 @@ import { useBonsai } from '@/lib/bonsai/store';
 import type { CareTask, TaskKind, Tree } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
-import { Cable, Camera, Check, CloudRain, Droplets, FlaskConical, Leaf, ListChecks, Shovel, X } from 'lucide-react';
+import { Cable, Camera, Check, CloudRain, Droplets, FlaskConical, Leaf, ListChecks, Shovel, Sprout, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const kindIcon: Record<TaskKind, typeof Droplets> = {
@@ -17,6 +17,7 @@ const kindIcon: Record<TaskKind, typeof Droplets> = {
     repot: Shovel,
     photo: Camera,
     wirecheck: Cable,
+    rooting: Sprout,
     custom: ListChecks
 };
 
@@ -34,6 +35,8 @@ const undoPatch = (task: CareTask, tree?: Tree): Partial<Tree> | null => {
             return { lastRepotted: tree.lastRepotted };
         case 'wirecheck':
             return { wireCheckedAt: tree.wireCheckedAt };
+        case 'rooting':
+            return { stage: tree.stage };
         default:
             return null;
     }
@@ -49,14 +52,21 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
     const complete = () => {
         const patch = undoPatch(task, tree);
         completeTask(task);
-        toast.success(task.kind === 'water' ? `${tree?.name ?? 'Plant'} watered.` : `${task.title} — done!`, {
-            action:
-                patch && task.treeId
-                    ? { label: 'Undo', onClick: () => updateTree(task.treeId!, patch) }
-                    : task.customId
-                      ? { label: 'Undo', onClick: () => reopenCustomTask(task.customId!) }
-                      : undefined
-        });
+        toast.success(
+            task.kind === 'water'
+                ? `${tree?.name ?? 'Plant'} watered.`
+                : task.kind === 'rooting'
+                  ? `${tree?.name ?? 'Cutting'} is rooted! Stage set to Development — feeding starts.`
+                  : `${task.title} — done!`,
+            {
+                action:
+                    patch && task.treeId
+                        ? { label: 'Undo', onClick: () => updateTree(task.treeId!, patch) }
+                        : task.customId
+                          ? { label: 'Undo', onClick: () => reopenCustomTask(task.customId!) }
+                          : undefined
+            }
+        );
     };
 
     return (

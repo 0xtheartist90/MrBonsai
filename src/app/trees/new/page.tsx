@@ -32,9 +32,12 @@ const NewTreePage = () => {
     const [location, setLocation] = useState('');
     const [notes, setNotes] = useState('');
     const [speciesId, setSpeciesId] = useState<string>();
+    const [speciesQuery, setSpeciesQuery] = useState('');
     const [birthYear, setBirthYear] = useState('');
     const [price, setPrice] = useState('');
     const [shop, setShop] = useState('');
+    const [acquiredDate, setAcquiredDate] = useState(new Date().toISOString().slice(0, 10));
+    const [stage, setStage] = useState<'cutting' | 'development' | 'refinement'>('development');
 
     // identification wizard state
     const [identifying, setIdentifying] = useState(false);
@@ -64,10 +67,11 @@ const NewTreePage = () => {
         const tree = addTree({
             name: name.trim(),
             speciesId,
-            acquiredAt: new Date().toISOString(),
+            acquiredAt: new Date(`${acquiredDate}T12:00:00`).toISOString(),
             location: location.trim() || 'Home',
             notes: notes.trim(),
             photo,
+            stage,
             birthYear: birthYear ? Number(birthYear) : undefined,
             purchasePrice: price ? Number(price) : undefined,
             purchasedAt: shop.trim() || undefined
@@ -120,6 +124,38 @@ const NewTreePage = () => {
                     placeholder='Bought at (nursery, web shop, market…)'
                     className='bg-card h-12 rounded-2xl border-none'
                 />
+                <div>
+                    <p className='text-muted-foreground mb-1 text-xs font-medium'>In your care since</p>
+                    <Input
+                        type='date'
+                        value={acquiredDate}
+                        max={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) => e.target.value && setAcquiredDate(e.target.value)}
+                        className='bg-card h-12 rounded-2xl border-none'
+                    />
+                </div>
+                <div>
+                    <p className='text-muted-foreground mb-1 text-xs font-medium'>Stage</p>
+                    <div className='flex gap-1.5'>
+                        {(
+                            [
+                                ['cutting', 'Cutting'],
+                                ['development', 'Development'],
+                                ['refinement', 'Refinement']
+                            ] as ['cutting' | 'development' | 'refinement', string][]
+                        ).map(([value, label]) => (
+                            <button
+                                key={value}
+                                onClick={() => setStage(value)}
+                                className={cn(
+                                    'flex-1 rounded-full px-3 py-2.5 text-xs font-semibold transition-colors',
+                                    stage === value ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'
+                                )}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             <section className='bg-card space-y-3 rounded-3xl p-4'>
@@ -163,8 +199,16 @@ const NewTreePage = () => {
                     </div>
                 )}
 
+                <Input
+                    value={speciesQuery}
+                    onChange={(e) => setSpeciesQuery(e.target.value)}
+                    placeholder='Search species (name or latin)…'
+                    className='bg-secondary/60 h-11 rounded-2xl border-none'
+                />
                 <div className='max-h-72 space-y-2 overflow-y-auto'>
-                    {SPECIES.map((s) => {
+                    {SPECIES.filter((s) =>
+                        `${s.name} ${s.latin}`.toLowerCase().includes(speciesQuery.toLowerCase())
+                    ).map((s) => {
                         const highlighted = matches.some((m) => m.id === s.id);
                         const active = speciesId === s.id;
 

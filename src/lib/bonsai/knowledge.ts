@@ -24,9 +24,9 @@ export const ARTICLES: Article[] = [
         level: 'beginner',
         minutes: 3,
         body: [
-            'Start with a species that forgives mistakes. Ficus, Chinese Elm, Dwarf Jade and Zelkova all tolerate irregular watering and respond well to pruning.',
-            'Decide where the tree will live first, then pick the species — not the other way round. A juniper on an indoor windowsill will slowly die, no matter how well you water it.',
-            'Buy from a bonsai nursery rather than a supermarket if you can: the tree will be healthier, correctly potted and honestly labelled.'
+            'Start with a species that forgives mistakes and loves tropical heat. Ficus (Golden Spoon or Triangle Fig), Dwarf Jade, Orange Jasmine and Ixora all tolerate beginner errors and thrive outdoors here year-round.',
+            'Decide where the tree will live first, then pick the species — not the other way round. Temperate species like maples and junipers are a running battle in lowland heat: they miss their winter rest, so treat them as advanced projects.',
+            'Local plant markets are a great source — trees are already acclimated to your climate. Check the trunk base for firmness, look under the leaves for pests, and ask what soil it is potted in.'
         ]
     },
     {
@@ -36,7 +36,7 @@ export const ARTICLES: Article[] = [
         minutes: 5,
         body: [
             'Maintenance pruning keeps the silhouette: trim shoots back to one or two leaves once they extend past the canopy. Do this throughout the growing season.',
-            'Structural pruning shapes the future of the tree: removing large branches, deciding the front, cutting back the apex. Do this once, in the right season for the species — usually early spring or late autumn.',
+            'Structural pruning shapes the future of the tree: removing large branches, deciding the front, cutting back the apex. For tropical species do this during strong active growth so wounds close fast; for the temperate species in your collection, use the cool season.',
             'Always ask: does this branch serve the design? Crossing branches, bar branches (two at the same height) and straight-up growth are the usual first candidates to remove.'
         ]
     },
@@ -58,7 +58,7 @@ export const ARTICLES: Article[] = [
         minutes: 7,
         body: [
             'Repotting refreshes the soil and keeps the root system fine and compact. Most trees need it every two to three years; the app tracks this per tree.',
-            'The window is short: just as buds swell in early spring. Repotting in the wrong season is the most common cause of losing an established tree.',
+            'Time it for warm, active growth — the start of the hot season is ideal for tropical species, so roots regrow immediately. Temperate species (maple, fringe tree) get the end of the cool season instead, right at bud swell.',
             'Remove no more than a third of the roots, work quickly in the shade, and keep the tree sheltered and slightly drier for a few weeks afterwards while new roots form.'
         ]
     },

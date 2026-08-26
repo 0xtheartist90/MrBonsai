@@ -3,7 +3,8 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { flushPhotoUploads, isPhotoRef, removePhoto, savePhoto } from './photo-db';
-import { SEASON_LABEL, addDays, currentSeason, startOfDay } from './season';
+import { addDays, currentSeason, startOfDay } from './season';
+import { collapsePhotoTasks, computeTasks } from './tasks';
 import {
     getUserId,
     onAuthChange,
@@ -36,8 +37,7 @@ const DATA_REV = 4;
 /** 26 Aug 2026: the user watered the entire collection by hand */
 const WATERED_ALL_AT = '2026-08-26T10:00:00.000Z';
 
-/** Multitech 16-16-16 label: 4-month supply — 3-4 g per 5" pot, 6-8 g per 10" pot */
-export const NPK_TOPUP_DAYS = 120;
+export { NPK_TOPUP_DAYS } from './tasks';
 
 const uid = (): string => Math.random().toString(36).slice(2, 10);
 
@@ -745,7 +745,11 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                 // due = lastWatered + interval, so aim lastWatered such that due lands tomorrow
                 const lastWatered = addDays(startOfDay(new Date()), 1 - interval).toISOString();
 
-                return touch({ ...tree, lastWatered });
+                return touch({
+                    ...tree,
+                    lastWatered,
+                    careLog: [{ date: new Date().toISOString(), kind: 'moist' as const }, ...(tree.careLog ?? [])].slice(0, 200)
+                });
             })
         );
     }, []);
@@ -765,12 +769,28 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
         if (!task.treeId) return;
-        if (task.kind === 'water') updateTree(task.treeId, { lastWatered: nowIso });
-        if (task.kind === 'fertilize') updateTree(task.treeId, { lastFertilized: nowIso });
-        if (task.kind === 'micro') updateTree(task.treeId, { lastMicronutrients: nowIso });
-        if (task.kind === 'repot') updateTree(task.treeId, { lastRepotted: nowIso });
-        if (task.kind === 'wirecheck') updateTree(task.treeId, { wireCheckedAt: nowIso });
-    }, [updateTree]);
+        const patch: Partial<Tree> = {};
+        let logKind: NonNullable<Tree['careLog']>[number]['kind'] | null = null;
+        if (task.kind === 'water') (patch.lastWatered = nowIso), (logKind = 'water');
+        if (task.kind === 'fertilize') (patch.lastFertilized = nowIso), (logKind = 'fertilize');
+        if (task.kind === 'micro') (patch.lastMicronutrients = nowIso), (logKind = 'micro');
+        if (task.kind === 'repot') (patch.lastRepotted = nowIso), (logKind = 'repot');
+        if (task.kind === 'wirecheck') (patch.wireCheckedAt = nowIso), (logKind = 'wirecheck');
+        if (task.kind === 'rooting') (patch.stage = 'development'), (logKind = 'rooted');
+        setTrees((t) =>
+            t.map((tree) =>
+                tree.id === task.treeId
+                    ? touch({
+                          ...tree,
+                          ...patch,
+                          careLog: logKind
+                              ? [{ date: nowIso, kind: logKind }, ...(tree.careLog ?? [])].slice(0, 200)
+                              : tree.careLog
+                      })
+                    : tree
+            )
+        );
+    }, []);
 
     const value: BonsaiContextValue = {
         ready,
@@ -808,153 +828,3 @@ export const useBonsai = (): BonsaiContextValue => {
     return ctx;
 };
 
-/** Derive due care tasks from species schedules + last-done dates */
-const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
-    const now = new Date();
-    const season = currentSeason(now);
-    const tasks: CareTask[] = [];
-
-    for (const tree of trees) {
-        const species = speciesById(tree.speciesId);
-        if (!species) continue;
-
-        // A tree's own schedule wins over the species default for the season
-        const waterInterval = tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[season];
-        const lastWatered = tree.lastWatered ? new Date(tree.lastWatered) : addDays(now, -waterInterval);
-        tasks.push({
-            key: `water-${tree.id}`,
-            kind: 'water',
-            treeId: tree.id,
-            title: `Check soil · ${tree.name}`,
-            detail: species.care.watering,
-            due: addDays(startOfDay(lastWatered), waterInterval)
-        });
-
-        // Cuttings: no feeding or repotting until rooted — only watering and photo reminders.
-        // A stressed or sick plant also gets no fertilizer: resolve the stress before feeding.
-        const isCutting = tree.stage === 'cutting';
-        const noFeeding = isCutting || (tree.health !== undefined && tree.health !== 'healthy');
-
-        // Fertilizer pauses after root work (see public/fertilizer_schedule_app_logic.md):
-        // NPK light 7-14d / moderate 14-21d / heavy 21-28d; micronutrients 14/18/21d
-        const severity = tree.lastRepotSeverity ?? 'moderate';
-        const npkPauseDays = { light: 10, moderate: 18, heavy: 24 }[severity];
-        const microPauseDays = { light: 14, moderate: 18, heavy: 21 }[severity];
-        const lastRepot = tree.lastRepotted ? startOfDay(new Date(tree.lastRepotted)) : null;
-        const later = (a: Date, b: Date | null): Date => (b && b > a ? b : a);
-
-        // Multitech 16-16-16 is SLOW-RELEASE: granules feed for ~3 months, so the task is a
-        // top-up on that cycle — not the species' liquid-feed rhythm, which would overfeed.
-        // The exact interval belongs to the product label; override it per tree in Details.
-        const speciesFeed = species.care.fertilizingIntervalDays[season];
-        const feedInterval = tree.careOverrides?.fertilizingDays ?? (speciesFeed === null ? null : NPK_TOPUP_DAYS);
-        if (feedInterval !== null && !noFeeding) {
-            // never fertilized: count from acquisition — a fresh (often just-repotted) plant should not be fed on day one
-            const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : new Date(tree.acquiredAt);
-            tasks.push({
-                key: `fertilize-${tree.id}`,
-                kind: 'fertilize',
-                treeId: tree.id,
-                title: `Top up 16-16-16 · ${tree.name}`,
-                detail: 'Multitech 4-month slow-release: ±3-4 g for a 5" pot, 6-8 g for 10". Skip if granules remain; healthy, growing trees only.',
-                due: later(addDays(startOfDay(lastFed), feedInterval), lastRepot && addDays(lastRepot, npkPauseDays))
-            });
-        }
-
-        // Nic-Spray EDTA micronutrients: every 4-6 weeks on established plants, never on cuttings
-        if (!noFeeding) {
-            // never applied: due from today, not retroactively overdue since acquisition
-            const lastMicro = tree.lastMicronutrients
-                ? new Date(tree.lastMicronutrients)
-                : new Date(Math.max(new Date(tree.acquiredAt).getTime(), addDays(now, -35).getTime()));
-            tasks.push({
-                key: `micro-${tree.id}`,
-                kind: 'micro',
-                treeId: tree.id,
-                title: `Micronutrients ${tree.name}`,
-                detail: 'Nic-Spray EDTA, label dilution. If leaves yellow with green veins, check pH and roots first.',
-                due: later(addDays(startOfDay(lastMicro), 35), lastRepot && addDays(lastRepot, microPauseDays))
-            });
-        }
-
-        // Repotting: due at the start of the hot season (warm active growth) once the interval elapses
-        const lastRepotted = tree.lastRepotted ? new Date(tree.lastRepotted) : new Date(tree.acquiredAt);
-        const repotYear = lastRepotted.getFullYear() + (tree.careOverrides?.repotYears ?? species.care.repotEveryYears);
-        const repotDue = new Date(repotYear, 2, 1);
-        if (!isCutting && repotDue.getTime() - now.getTime() < 60 * 86_400_000) {
-            tasks.push({
-                key: `repot-${tree.id}`,
-                kind: 'repot',
-                treeId: tree.id,
-                title: `Repot ${tree.name}`,
-                detail: species.care.repotting,
-                due: repotDue
-            });
-        }
-
-        // Wire check: wire bites in as branches thicken — check 6 weeks after wiring
-        if (tree.lastWired && (!tree.wireCheckedAt || tree.wireCheckedAt < tree.lastWired)) {
-            tasks.push({
-                key: `wirecheck-${tree.id}`,
-                kind: 'wirecheck',
-                treeId: tree.id,
-                title: `Check wire on ${tree.name}`,
-                detail: 'Make sure the wire is not cutting into the bark; remove or rewrap if needed.',
-                due: addDays(startOfDay(new Date(tree.lastWired)), tree.careOverrides?.wireCheckDays ?? 42)
-            });
-        }
-
-        // Seasonal photo reminder: no progress photo taken this season yet
-        const seasonHasPhoto = tree.progress.some(
-            (p) => p.photo && currentSeason(new Date(p.date)) === season && daysBetween(new Date(p.date), now) < 100
-        );
-        if (!seasonHasPhoto) {
-            tasks.push({
-                key: `photo-${tree.id}`,
-                kind: 'photo',
-                treeId: tree.id,
-                title: `Seasonal photo of ${tree.name}`,
-                detail: 'Capture this season for the visual history of your tree.',
-                due: now
-            });
-        }
-    }
-
-    for (const task of customTasks) {
-        if (task.done) continue;
-        tasks.push({
-            key: `custom-${task.id}`,
-            kind: 'custom',
-            treeId: task.treeId,
-            title: task.title,
-            detail: 'Custom task',
-            due: new Date(task.due),
-            customId: task.id
-        });
-    }
-
-    return tasks.sort((a, b) => a.due.getTime() - b.due.getTime());
-};
-
-const daysBetween = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / 86_400_000);
-
-/**
- * One photo reminder per tree floods the agenda — every tree wants one at the start of a season.
- * Collection-wide views get a single "photo round" row instead.
- */
-const collapsePhotoTasks = (tasks: CareTask[]): CareTask[] => {
-    const photos = tasks.filter((t) => t.kind === 'photo');
-    if (photos.length <= 1) return tasks;
-
-    const rest = tasks.filter((t) => t.kind !== 'photo');
-    const season = SEASON_LABEL[currentSeason()];
-    const round: CareTask = {
-        key: 'photo-round',
-        kind: 'photo',
-        title: `${season} photo round`,
-        detail: `${photos.length} plants still need a photo this season.`,
-        due: photos.reduce((earliest, t) => (t.due < earliest ? t.due : earliest), photos[0].due)
-    };
-
-    return [...rest, round].sort((a, b) => a.due.getTime() - b.due.getTime());
-};

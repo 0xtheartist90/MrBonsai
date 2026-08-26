@@ -30,14 +30,18 @@ import {
     ArrowLeft,
     BookOpen,
     Cable,
+    Columns2,
     Camera,
+    CloudRain,
     Droplets,
+    FlaskConical,
     Layers,
     Leaf,
     Pencil,
     Scissors,
     Shovel,
     Sparkles,
+    Sprout,
     Sun,
     Thermometer,
     TreeDeciduous,
@@ -60,6 +64,17 @@ const toggleKind = (kinds: ProgressKind[], kind: ProgressKind): ProgressKind[] =
 const SOIL_COMPONENTS = ['pumice', 'akadama', 'lava', 'cocopeat', 'grit', 'potting soil', 'sphagnum', 'perlite'];
 
 const FERTILIZERS = ['organic pellets', 'liquid balanced', 'slow-release', 'biogold', 'none (rooting)'];
+
+
+const CARE_LOG_META: Record<string, { label: string; icon: typeof Droplets }> = {
+    water: { label: 'Watered', icon: Droplets },
+    moist: { label: 'Checked — still moist', icon: CloudRain },
+    fertilize: { label: '16-16-16 topped up', icon: Leaf },
+    micro: { label: 'Micronutrients applied', icon: FlaskConical },
+    repot: { label: 'Repotted', icon: Shovel },
+    wirecheck: { label: 'Wire checked', icon: Cable },
+    rooted: { label: 'Marked as rooted', icon: Sprout }
+};
 
 const KIND_LABEL: Record<ProgressKind, string> = {
     note: 'Note',
@@ -97,7 +112,12 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const [statEditor, setStatEditor] = useState<'age' | 'wired' | 'potted' | 'pruned' | null>(null);
     const [statValue, setStatValue] = useState('');
     const [confirmingDelete, setConfirmingDelete] = useState(false);
-    const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+    const [lightboxZoomed, setLightboxZoomed] = useState(false);
+    const [compareOpen, setCompareOpen] = useState(false);
+    const [compareA, setCompareA] = useState(0);
+    const [compareB, setCompareB] = useState(0);
+    const touchStartX = { current: 0 } as { current: number };
 
     if (!ready) return <LoadingScreen />;
 
@@ -135,6 +155,25 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const lastPruned = lastPrunedEntry?.date;
     /** Timeline entries shown as pickable history inside the stat drawer */
     const statHistory = statEditor === 'wired' ? wiringHistory : statEditor === 'pruned' ? pruningHistory : [];
+
+    // every photo this tree owns, oldest first — powers the lightbox and season compare
+    const photoItems = [...tree.progress.filter((p) => p.photo).map((p) => ({ photo: p.photo!, date: p.date }))].sort(
+        (a, b) => a.date.localeCompare(b.date)
+    );
+    if (tree.photo && !photoItems.some((i) => i.photo === tree.photo)) {
+        photoItems.push({ photo: tree.photo, date: new Date().toISOString() });
+    }
+
+    const openLightbox = (photo: string) => {
+        const idx = photoItems.findIndex((i) => i.photo === photo);
+        setLightboxZoomed(false);
+        setLightboxIndex(idx === -1 ? 0 : idx);
+    };
+
+    const stepLightbox = (dir: number) => {
+        setLightboxZoomed(false);
+        setLightboxIndex((i) => (i === null ? i : (i + dir + photoItems.length) % photoItems.length));
+    };
 
     const today = new Date().toISOString().slice(0, 10);
 
@@ -219,44 +258,46 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
 
     return (
         <div className='space-y-4'>
-            <div className='relative -mx-4 -mt-4 h-80 overflow-hidden'>
+            {/* photo + the six cards below fill exactly one viewport together */}
+            <div className='relative -mx-4 -mt-4 h-[calc(100dvh-23.5rem)] overflow-hidden'>
+                {/* full-bleed photo with only the title living inside it */}
                 <TreePhoto photo={tree.photo} name={tree.name} />
-                <div className='absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/60 via-black/25 to-transparent' />
+                <button
+                    onClick={() => tree.photo && openLightbox(tree.photo)}
+                    aria-label='View photo full screen'
+                    className='absolute inset-0'
+                />
+                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/70 via-black/30 to-transparent' />
                 <button
                     onClick={() => router.back()}
                     aria-label='Back'
-                    className='absolute top-4 left-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
+                    className='absolute top-4 left-4 z-20 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
                     <ArrowLeft className='size-5' />
                 </button>
                 <button
                     onClick={() => setConfirmingDelete(true)}
                     aria-label='Delete tree'
-                    className='text-destructive absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
+                    className='text-destructive absolute top-4 right-4 z-20 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
                     <Trash2 className='size-4' />
                 </button>
-                <button
-                    onClick={() => tree.photo && setLightboxPhoto(tree.photo)}
-                    aria-label='View photo full screen'
-                    className='absolute inset-0'
-                />
-                <div className='pointer-events-none absolute inset-x-4 bottom-4 text-white'>
-                    <span className='flex gap-1.5'>
+                <div className='pointer-events-none absolute inset-x-4 bottom-4 z-10'>
+                    <div className='mb-1.5 flex gap-1.5'>
                         {tree.stage && (
-                            <span className='mb-1.5 inline-block rounded-full bg-white/25 px-2.5 py-0.5 text-[11px] font-semibold capitalize backdrop-blur-sm'>
+                            <span className='inline-block rounded-full bg-white/25 px-2.5 py-0.5 text-[11px] font-semibold text-white capitalize backdrop-blur-sm'>
                                 {tree.stage}
                             </span>
                         )}
                         {tree.health && tree.health !== 'healthy' && (
                             <span
                                 className={cn(
-                                    'mb-1.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize text-white backdrop-blur-sm',
+                                    'inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white capitalize backdrop-blur-sm',
                                     tree.health === 'sick' ? 'bg-destructive/80' : 'bg-amber-600/80'
                                 )}>
                                 {tree.health} · feeding paused
                             </span>
                         )}
-                    </span>
-                    <h1 className='text-3xl font-bold tracking-tight drop-shadow-sm'>{tree.name}</h1>
+                    </div>
+                    <h1 className='text-3xl font-bold tracking-tight text-white drop-shadow-sm'>{tree.name}</h1>
                     <p className='text-sm text-white/85'>
                         {species.name} · <span className='italic'>{species.latin}</span>
                     </p>
@@ -317,18 +358,95 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                 />
             </div>
 
-            {lightboxPhoto && (
-                <button
-                    onClick={() => setLightboxPhoto(null)}
-                    aria-label='Close photo'
-                    className='fixed inset-0 z-50 flex items-center justify-center bg-black/95'>
-                    <div className='max-h-full w-full'>
-                        <TreePhoto photo={lightboxPhoto} name={tree.name} className='max-h-dvh object-contain' />
+            {lightboxIndex !== null && photoItems[lightboxIndex] && (
+                <div
+                    className='fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/95'
+                    onTouchStart={(e) => (touchStartX.current = e.touches[0].clientX)}
+                    onTouchEnd={(e) => {
+                        const delta = e.changedTouches[0].clientX - touchStartX.current;
+                        if (Math.abs(delta) > 40) stepLightbox(delta < 0 ? 1 : -1);
+                    }}>
+                    <button
+                        onClick={() => setLightboxZoomed((z) => !z)}
+                        aria-label={lightboxZoomed ? 'Zoom out' : 'Zoom in'}
+                        className={cn(
+                            'max-h-full w-full transition-transform duration-200',
+                            lightboxZoomed && 'scale-[2.2]'
+                        )}>
+                        <TreePhoto
+                            photo={photoItems[lightboxIndex].photo}
+                            name={tree.name}
+                            className='max-h-dvh object-contain'
+                        />
+                    </button>
+                    <div className='absolute inset-x-0 bottom-6 flex items-center justify-center gap-4 text-white'>
+                        {photoItems.length > 1 && (
+                            <button
+                                onClick={() => stepLightbox(-1)}
+                                aria-label='Previous photo'
+                                className='flex size-11 items-center justify-center rounded-full bg-white/15 backdrop-blur'>
+                                <ArrowLeft className='size-5' />
+                            </button>
+                        )}
+                        <div className='text-center'>
+                            <p className='text-sm font-semibold'>{formatDate(photoItems[lightboxIndex].date)}</p>
+                            {photoItems.length > 1 && (
+                                <p className='text-xs text-white/70'>
+                                    {lightboxIndex + 1} / {photoItems.length}
+                                </p>
+                            )}
+                        </div>
+                        {photoItems.length > 1 && (
+                            <button
+                                onClick={() => stepLightbox(1)}
+                                aria-label='Next photo'
+                                className='flex size-11 items-center justify-center rounded-full bg-white/15 backdrop-blur'>
+                                <ArrowLeft className='size-5 rotate-180' />
+                            </button>
+                        )}
                     </div>
-                    <span className='absolute top-4 right-4 flex size-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur'>
+                    <button
+                        onClick={() => setLightboxIndex(null)}
+                        aria-label='Close photo'
+                        className='absolute top-4 right-4 flex size-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur'>
                         <X className='size-5' />
-                    </span>
-                </button>
+                    </button>
+                </div>
+            )}
+
+            {compareOpen && photoItems.length >= 2 && (
+                <div className='fixed inset-0 z-50 flex flex-col bg-black/95'>
+                    {([0, 1] as const).map((side) => {
+                        const index = side === 0 ? compareA : compareB;
+                        const setIndex = side === 0 ? setCompareA : setCompareB;
+
+                        return (
+                            <div key={side} className='relative min-h-0 flex-1'>
+                                <TreePhoto
+                                    photo={photoItems[index]?.photo}
+                                    name={tree.name}
+                                    className='object-contain'
+                                />
+                                <select
+                                    value={index}
+                                    onChange={(e) => setIndex(Number(e.target.value))}
+                                    className='absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur'>
+                                    {photoItems.map((item, i) => (
+                                        <option key={i} value={i} className='text-black'>
+                                            {formatDate(item.date)} · {SEASON_LABEL[currentSeason(new Date(item.date))]}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        );
+                    })}
+                    <button
+                        onClick={() => setCompareOpen(false)}
+                        aria-label='Close compare'
+                        className='absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur'>
+                        <X className='size-5' />
+                    </button>
+                </div>
             )}
 
             <Drawer open={confirmingDelete} onOpenChange={setConfirmingDelete}>
@@ -482,6 +600,30 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                         <CareLine icon={Thermometer} title='Temperature' text={species.care.temperature} />
                     </div>
 
+                    {(tree.careLog ?? []).length > 0 && (
+                        <div className='bg-card space-y-2.5 rounded-3xl p-4 shadow-sm'>
+                            <h2 className='font-semibold'>Care history</h2>
+                            {(tree.careLog ?? []).slice(0, 10).map((entry, i) => {
+                                const meta = CARE_LOG_META[entry.kind];
+
+                                return (
+                                    <div key={`${entry.date}-${i}`} className='flex items-center gap-3'>
+                                        <span className='bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-xl'>
+                                            <meta.icon className='size-4' strokeWidth={1.8} />
+                                        </span>
+                                        <p className='flex-1 text-sm'>{meta.label}</p>
+                                        <p className='text-muted-foreground text-xs'>{formatDate(entry.date)}</p>
+                                    </div>
+                                );
+                            })}
+                            {(tree.careLog ?? []).length > 10 && (
+                                <p className='text-muted-foreground text-xs'>
+                                    + {(tree.careLog ?? []).length - 10} earlier actions
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     <Link
                         href={`/learn/${species.id}`}
                         className='bg-card flex items-center gap-3 rounded-3xl p-4 text-sm font-medium shadow-sm'>
@@ -574,9 +716,23 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                             </div>
                         </div>
                     ) : (
-                        <Button onClick={() => setAddingProgress(true)} className='h-12 w-full rounded-full shadow-sm'>
-                            <Camera className='size-4' /> New progress entry
-                        </Button>
+                        <div className='flex gap-2'>
+                            <Button onClick={() => setAddingProgress(true)} className='h-12 flex-1 rounded-full shadow-sm'>
+                                <Camera className='size-4' /> New progress entry
+                            </Button>
+                            {photoItems.length >= 2 && (
+                                <Button
+                                    variant='secondary'
+                                    onClick={() => {
+                                        setCompareA(0);
+                                        setCompareB(photoItems.length - 1);
+                                        setCompareOpen(true);
+                                    }}
+                                    className='h-12 rounded-full'>
+                                    <Columns2 className='size-4' /> Compare
+                                </Button>
+                            )}
+                        </div>
                     )}
 
                     {tree.progress.length === 0 ? (
@@ -595,7 +751,7 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                 <li key={entry.id} className='bg-card overflow-hidden rounded-3xl shadow-sm'>
                                     {entry.photo && (
                                         <button
-                                            onClick={() => setLightboxPhoto(entry.photo!)}
+                                            onClick={() => openLightbox(entry.photo!)}
                                             aria-label='View photo full screen'
                                             className='block h-48 w-full'>
                                             <TreePhoto photo={entry.photo} name={tree.name} />
@@ -1060,7 +1216,8 @@ const ScheduleCard = ({
     rhythm,
     status,
     urgent,
-    onClick
+    onClick,
+    className
 }: {
     icon: typeof Droplets;
     label: string;
@@ -1068,10 +1225,14 @@ const ScheduleCard = ({
     status: string;
     urgent: boolean;
     onClick: () => void;
+    className?: string;
 }) => (
     <button
         onClick={onClick}
-        className='bg-card flex items-center gap-3 rounded-2xl p-3 text-left shadow-sm transition-transform active:scale-[0.97]'>
+        className={cn(
+            'bg-card flex items-center gap-3 rounded-2xl p-3 text-left shadow-sm transition-transform active:scale-[0.97]',
+            className
+        )}>
         <span
             className={cn(
                 'flex size-11 shrink-0 items-center justify-center rounded-2xl',
@@ -1093,16 +1254,21 @@ const StatChip = ({
     icon: Icon,
     label,
     value,
-    onClick
+    onClick,
+    className
 }: {
     icon: typeof Cable;
     label: string;
     value: string;
     onClick?: () => void;
+    className?: string;
 }) => (
     <button
         onClick={onClick}
-        className='bg-card flex shrink-0 snap-start items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left shadow-sm transition-transform active:scale-95'>
+        className={cn(
+            'bg-card flex shrink-0 snap-start items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left shadow-sm transition-transform active:scale-95',
+            className
+        )}>
         <span className='bg-accent text-accent-foreground flex size-8 items-center justify-center rounded-xl'>
             <Icon className='size-4' strokeWidth={1.8} />
         </span>
