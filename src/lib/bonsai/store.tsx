@@ -12,7 +12,11 @@ const STORAGE_KEY = 'mr-bonsai-v3';
 interface PersistedState {
     trees: Tree[];
     customTasks: CustomTask[];
+    /** Data revision — bumping it lets new code append trees to an existing collection */
+    rev?: number;
 }
+
+const DATA_REV = 2;
 
 const uid = (): string => Math.random().toString(36).slice(2, 10);
 
@@ -41,6 +45,109 @@ const migrateTree = (tree: Tree): Tree => ({
 /** Every idb photo reference a tree owns — cover and progress timeline */
 const photoRefs = (tree: Tree): string[] =>
     [tree.photo, ...tree.progress.map((p) => p.photo)].filter(isPhotoRef);
+
+/** Kamthieng Market purchases of 23 & 26 Aug 2026 plus the existing orange plant */
+const newCollectionAug2026 = (): Tree[] => {
+    const bought26 = '2026-08-26T09:00:00.000Z';
+    const bought23 = '2026-08-23T09:00:00.000Z';
+    const worked24 = '2026-08-24T09:00:00.000Z';
+    const market = 'Kamthieng Market';
+
+    const tree = (t: Omit<Tree, 'id' | 'progress' | 'notes'> & { notes?: string; progress?: ProgressEntry[] }): Tree => ({
+        id: uid(),
+        progress: [],
+        notes: '',
+        lastWatered: '2026-08-25T09:00:00.000Z',
+        lastFertilized: undefined,
+        lastRepotted: t.acquiredAt,
+        stage: 'development',
+        ...t
+    });
+
+    const entry = (kind: ProgressEntry['kind'], note: string): ProgressEntry => ({
+        id: uid(),
+        date: worked24,
+        kind,
+        note
+    });
+
+    return [
+        // — 26 Aug 2026 —
+        tree({ name: 'Japanese Blue Bell 1', speciesId: 'blue-bell', acquiredAt: bought26, location: 'Outside', purchasePrice: 80, purchasedAt: market }),
+        tree({ name: 'Japanese Blue Bell 2', speciesId: 'blue-bell', acquiredAt: bought26, location: 'Outside', purchasePrice: 80, purchasedAt: market }),
+        tree({ name: 'Chinese Fringe Tree', speciesId: 'chinese-fringe', acquiredAt: bought26, location: 'Outside', purchasePrice: 250, purchasedAt: market }),
+        tree({ name: 'Dragon Pine', speciesId: 'dragon-juniper', acquiredAt: bought26, location: 'Outside — full sun', purchasePrice: 150, purchasedAt: market }),
+        tree({ name: 'Orange Jasmine', speciesId: 'orange-jasmine', acquiredAt: bought26, location: 'Outside', purchasePrice: 150, purchasedAt: market }),
+        tree({ name: 'Creeping Juniper 4', speciesId: 'creeping-juniper', acquiredAt: bought26, location: 'Outside — full sun, max airflow', purchasePrice: 40, purchasedAt: market }),
+        tree({ name: 'Creeping Juniper 5', speciesId: 'creeping-juniper', acquiredAt: bought26, location: 'Outside — full sun, max airflow', purchasePrice: 40, purchasedAt: market }),
+        tree({ name: 'Creeping Juniper 6', speciesId: 'creeping-juniper', acquiredAt: bought26, location: 'Outside — full sun, max airflow', purchasePrice: 40, purchasedAt: market }),
+        // — 23 Aug 2026 —
+        tree({
+            name: 'Red Japanese Maple',
+            speciesId: 'japanese-maple',
+            acquiredAt: bought23,
+            location: 'Outside — morning sun, afternoon shade',
+            purchasePrice: 50,
+            purchasedAt: market,
+            notes: 'Red-leaved Japanese Maple. In this heat: morning sun only and never let the small pot dry out.'
+        }),
+        tree({ name: 'Ficus Triangularis', speciesId: 'triangle-fig', acquiredAt: bought23, location: 'Outside', purchasePrice: 35, purchasedAt: market }),
+        tree({
+            name: 'Dok Khem',
+            speciesId: 'ixora',
+            acquiredAt: bought23,
+            location: 'Outside — full sun',
+            purchasePrice: 35,
+            purchasedAt: market,
+            lastRepotted: worked24,
+            progress: [
+                entry('pruning', 'First pruning after purchase.'),
+                entry('repotting', 'Repotted into fresh mix the day after purchase.')
+            ]
+        }),
+        tree({
+            name: 'Creeping Juniper 2',
+            speciesId: 'creeping-juniper',
+            acquiredAt: bought23,
+            location: 'Outside — full sun, max airflow',
+            purchasePrice: 40,
+            purchasedAt: market,
+            lastRepotted: worked24,
+            lastWired: worked24,
+            progress: [
+                entry('wiring', 'Wired the day after purchase.'),
+                entry('repotting', 'Repotted into a free-draining mix.')
+            ]
+        }),
+        tree({
+            name: 'Creeping Juniper 3',
+            speciesId: 'creeping-juniper',
+            acquiredAt: bought23,
+            location: 'Outside — full sun, max airflow',
+            purchasePrice: 40,
+            purchasedAt: market,
+            lastRepotted: worked24,
+            lastWired: worked24,
+            progress: [
+                entry('wiring', 'Wired the day after purchase.'),
+                entry('repotting', 'Repotted into a free-draining mix.')
+            ]
+        }),
+        // — already owned —
+        tree({
+            name: 'Sweet Orange',
+            speciesId: 'sweet-orange',
+            acquiredAt: bought23,
+            location: 'Outside — full sun',
+            lastRepotted: worked24,
+            progress: [
+                entry('repotting', 'Repotted into fresh free-draining mix.'),
+                entry('pruning', 'Pruned back after repotting.')
+            ],
+            notes: 'Owned before the Kamthieng purchases; repotted and pruned on 24 Aug 2026.'
+        })
+    ];
+};
 
 const seedTrees = (): Tree[] => {
     const now = new Date();
@@ -185,7 +292,8 @@ const seedTrees = (): Tree[] => {
             purchasedAt: 'Own propagation',
             stage: 'cutting',
             notes: 'Rooting phase: constantly lightly moist, never soggy, high humidity with daily fresh air against mold. Leave the first flush of growth alone — roots and reserves before any pruning.'
-        })
+        }),
+        ...newCollectionAug2026()
     ];
 };
 
@@ -220,7 +328,15 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw) as PersistedState;
-                setTrees((parsed.trees ?? []).map(migrateTree));
+                let trees = (parsed.trees ?? []).map(migrateTree);
+                // Older saved collections predate the Aug 2026 purchases — append what's missing
+                if ((parsed.rev ?? 1) < DATA_REV) {
+                    const additions = newCollectionAug2026().filter(
+                        (added) => !trees.some((t) => t.name === added.name)
+                    );
+                    trees = [...trees, ...additions];
+                }
+                setTrees(trees);
                 setCustomTasks(parsed.customTasks ?? []);
             } else {
                 setTrees(seedTrees());
@@ -234,7 +350,10 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (!ready) return;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ trees, customTasks } satisfies PersistedState));
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({ trees, customTasks, rev: DATA_REV } satisfies PersistedState)
+            );
         } catch {
             // storage full (photos) — keep running in memory
         }
