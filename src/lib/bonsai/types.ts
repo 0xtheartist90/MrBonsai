@@ -51,6 +51,11 @@ export interface Tree {
     birthYear?: number;
     /** Development stage: cuttings get gentler care guidance */
     stage?: 'cutting' | 'development' | 'refinement';
+    /** Per-tree schedule overrides in days; unset fields follow the species schedule */
+    careOverrides?: {
+        wateringDays?: number;
+        fertilizingDays?: number;
+    };
     purchasePrice?: number;
     purchasedAt?: string; // shop / seller
     lastWatered?: string;

@@ -355,6 +355,78 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                         </p>
                     </div>
 
+                    <div className='bg-card space-y-3 rounded-3xl p-4 shadow-sm'>
+                        <div>
+                            <h2 className='font-semibold'>Care schedule</h2>
+                            <p className='text-muted-foreground mt-0.5 text-xs leading-relaxed'>
+                                Your pot, soil mix and spot dry differently than the species average — set your own
+                                rhythm here. Empty fields follow the {species.name} schedule, which shifts with the
+                                seasons.
+                            </p>
+                        </div>
+                        <div className='grid grid-cols-2 gap-3'>
+                            <Field label='Water every (days)'>
+                                <Input
+                                    type='number'
+                                    min={1}
+                                    defaultValue={tree.careOverrides?.wateringDays}
+                                    placeholder={`Species: ${species.care.wateringIntervalDays[season]}`}
+                                    onBlur={(e) =>
+                                        updateTree(tree.id, {
+                                            careOverrides: {
+                                                ...tree.careOverrides,
+                                                wateringDays: e.target.value ? Math.max(1, Number(e.target.value)) : undefined
+                                            }
+                                        })
+                                    }
+                                    className='bg-secondary/60 h-11 rounded-2xl border-none'
+                                />
+                            </Field>
+                            <Field label='Fertilize every (days)'>
+                                <Input
+                                    type='number'
+                                    min={1}
+                                    defaultValue={tree.careOverrides?.fertilizingDays}
+                                    placeholder={
+                                        species.care.fertilizingIntervalDays[season] === null
+                                            ? 'Species: paused'
+                                            : `Species: ${species.care.fertilizingIntervalDays[season]}`
+                                    }
+                                    onBlur={(e) =>
+                                        updateTree(tree.id, {
+                                            careOverrides: {
+                                                ...tree.careOverrides,
+                                                fertilizingDays: e.target.value ? Math.max(1, Number(e.target.value)) : undefined
+                                            }
+                                        })
+                                    }
+                                    className='bg-secondary/60 h-11 rounded-2xl border-none'
+                                />
+                            </Field>
+                        </div>
+                        <p className='text-muted-foreground text-xs'>
+                            Now watering every{' '}
+                            <span className='text-foreground font-semibold'>
+                                {tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[season]}
+                            </span>{' '}
+                            days
+                            {tree.stage === 'cutting' ? (
+                                <> · feeding paused while rooting</>
+                            ) : (
+                                <>
+                                    {' '}
+                                    · feeding every{' '}
+                                    <span className='text-foreground font-semibold'>
+                                        {(tree.careOverrides?.fertilizingDays ??
+                                            species.care.fertilizingIntervalDays[season]) ?? '— (paused)'}
+                                    </span>{' '}
+                                    days
+                                </>
+                            )}
+                            .
+                        </p>
+                    </div>
+
                     <div className='bg-card rounded-3xl p-4 shadow-sm'>
                         <h2 className='mb-2 font-semibold'>Notes</h2>
                         <Textarea

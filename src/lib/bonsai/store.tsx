@@ -331,7 +331,8 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
         const species = speciesById(tree.speciesId);
         if (!species) continue;
 
-        const waterInterval = species.care.wateringIntervalDays[season];
+        // A tree's own schedule wins over the species default for the season
+        const waterInterval = tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[season];
         const lastWatered = tree.lastWatered ? new Date(tree.lastWatered) : addDays(now, -waterInterval);
         tasks.push({
             key: `water-${tree.id}`,
@@ -345,7 +346,7 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
         // Cuttings: no feeding or repotting until rooted — only watering and photo reminders
         const isCutting = tree.stage === 'cutting';
 
-        const feedInterval = species.care.fertilizingIntervalDays[season];
+        const feedInterval = tree.careOverrides?.fertilizingDays ?? species.care.fertilizingIntervalDays[season];
         if (feedInterval !== null && !isCutting) {
             const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : addDays(now, -feedInterval);
             tasks.push({
