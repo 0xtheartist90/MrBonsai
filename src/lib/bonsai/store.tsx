@@ -1,9 +1,18 @@
 'use client';
 
-import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { isPhotoRef, removePhoto, savePhoto } from './photo-db';
+import { flushPhotoUploads, isPhotoRef, removePhoto, savePhoto } from './photo-db';
 import { SEASON_LABEL, addDays, currentSeason, startOfDay } from './season';
+import {
+    getUserId,
+    onAuthChange,
+    pullState,
+    pushState,
+    signIn as syncAuthSignIn,
+    signOut as syncAuthSignOut,
+    syncConfigured
+} from './sync';
 import { speciesById } from './species';
 import type { CareTask, CustomTask, ProgressEntry, Tree } from './types';
 
@@ -14,7 +23,11 @@ interface PersistedState {
     customTasks: CustomTask[];
     /** Data revision — bumping it lets new code append trees to an existing collection */
     rev?: number;
+    /** Last local change — the newer side wins when local and cloud state differ */
+    updatedAt?: string;
 }
+
+export type SyncStatus = 'off' | 'signedOut' | 'syncing' | 'synced' | 'error';
 
 const DATA_REV = 4;
 
@@ -346,7 +359,52 @@ interface BonsaiContextValue {
     tasks: CareTask[];
     /** Same list for collection-wide views, with the seasonal photo reminders collapsed into one */
     agenda: CareTask[];
+    syncStatus: SyncStatus;
+    syncSignIn: (email: string, password: string) => Promise<string | null>;
+    syncSignOut: () => Promise<void>;
 }
+
+/** Runs the migration chain over a persisted state, wherever it came from */
+const hydrate = (parsed: PersistedState): { trees: Tree[]; customTasks: CustomTask[] } => {
+    let trees = (parsed.trees ?? []).map(migrateTree);
+    const rev = parsed.rev ?? 1;
+    // rev 2: the Aug 2026 purchases — append what's missing
+    if (rev < 2) {
+        const additions = newCollectionAug2026().filter((added) => !trees.some((t) => t.name === added.name));
+        trees = [...trees, ...additions];
+    }
+    // rev 3: the whole collection was watered on 26 Aug 2026
+    if (rev < 3) {
+        trees = trees.map((t) =>
+            !t.lastWatered || t.lastWatered < WATERED_ALL_AT ? { ...t, lastWatered: WATERED_ALL_AT } : t
+        );
+    }
+    // rev 4: replacing a cover photo used to overwrite it silently — restore the
+    // original seed photo into the timeline of any tree whose cover moved on
+    if (rev < 4) {
+        const seedPhotoByName = new Map(seedTrees().map((t) => [t.name, t.photo]));
+        trees = trees.map((t) => {
+            const original = seedPhotoByName.get(t.name);
+            if (!original || t.photo === original || t.progress.some((p) => p.photo === original)) return t;
+
+            return {
+                ...t,
+                progress: [
+                    ...t.progress,
+                    {
+                        id: uid(),
+                        date: t.acquiredAt,
+                        note: 'Original photo — restored to the timeline when the cover was replaced.',
+                        kinds: [],
+                        photo: original
+                    }
+                ]
+            };
+        });
+    }
+
+    return { trees, customTasks: parsed.customTasks ?? [] };
+};
 
 const BonsaiContext = createContext<BonsaiContextValue | null>(null);
 
@@ -354,52 +412,38 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     const [ready, setReady] = useState(false);
     const [trees, setTrees] = useState<Tree[]>([]);
     const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncConfigured ? 'signedOut' : 'off');
+    const localUpdatedAtRef = useRef<string | undefined>(undefined);
+    const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    /** Adopt cloud state when it is newer than what this device has */
+    const pullFromCloud = useCallback(async () => {
+        if (!(await getUserId())) {
+            setSyncStatus(syncConfigured ? 'signedOut' : 'off');
+
+            return;
+        }
+        setSyncStatus('syncing');
+        const remote = await pullState();
+        if (remote && (!localUpdatedAtRef.current || remote.updatedAt > localUpdatedAtRef.current)) {
+            const state = hydrate(remote.data as PersistedState);
+            localUpdatedAtRef.current = remote.updatedAt;
+            setTrees(state.trees);
+            setCustomTasks(state.customTasks);
+        }
+        setSyncStatus('synced');
+        void flushPhotoUploads();
+    }, []);
 
     useEffect(() => {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw) as PersistedState;
-                let trees = (parsed.trees ?? []).map(migrateTree);
-                const rev = parsed.rev ?? 1;
-                // rev 2: the Aug 2026 purchases — append what's missing
-                if (rev < 2) {
-                    const additions = newCollectionAug2026().filter(
-                        (added) => !trees.some((t) => t.name === added.name)
-                    );
-                    trees = [...trees, ...additions];
-                }
-                // rev 3: the whole collection was watered on 26 Aug 2026
-                if (rev < 3) {
-                    trees = trees.map((t) =>
-                        !t.lastWatered || t.lastWatered < WATERED_ALL_AT ? { ...t, lastWatered: WATERED_ALL_AT } : t
-                    );
-                }
-                // rev 4: replacing a cover photo used to overwrite it silently — restore the
-                // original seed photo into the timeline of any tree whose cover moved on
-                if (rev < 4) {
-                    const seedPhotoByName = new Map(seedTrees().map((t) => [t.name, t.photo]));
-                    trees = trees.map((t) => {
-                        const original = seedPhotoByName.get(t.name);
-                        if (!original || t.photo === original || t.progress.some((p) => p.photo === original)) return t;
-
-                        return {
-                            ...t,
-                            progress: [
-                                ...t.progress,
-                                {
-                                    id: uid(),
-                                    date: t.acquiredAt,
-                                    note: 'Original photo — restored to the timeline when the cover was replaced.',
-                                    kinds: [],
-                                    photo: original
-                                }
-                            ]
-                        };
-                    });
-                }
-                setTrees(trees);
-                setCustomTasks(parsed.customTasks ?? []);
+                const state = hydrate(parsed);
+                localUpdatedAtRef.current = parsed.updatedAt;
+                setTrees(state.trees);
+                setCustomTasks(state.customTasks);
             } else {
                 setTrees(seedTrees());
             }
@@ -407,19 +451,48 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
             setTrees(seedTrees());
         }
         setReady(true);
-    }, []);
+        void pullFromCloud();
+
+        return onAuthChange(() => void pullFromCloud());
+    }, [pullFromCloud]);
 
     useEffect(() => {
         if (!ready) return;
+        const updatedAt = new Date().toISOString();
+        localUpdatedAtRef.current = updatedAt;
         try {
             localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ trees, customTasks, rev: DATA_REV } satisfies PersistedState)
+                JSON.stringify({ trees, customTasks, rev: DATA_REV, updatedAt } satisfies PersistedState)
             );
         } catch {
-            // storage full (photos) — keep running in memory
+            // storage full — keep running in memory
         }
+        // debounce the cloud push so rapid edits become one write
+        if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+        pushTimerRef.current = setTimeout(() => {
+            void (async () => {
+                if (!(await getUserId())) return;
+                const ok = await pushState({ trees, customTasks, rev: DATA_REV, updatedAt }, updatedAt);
+                setSyncStatus(ok ? 'synced' : 'error');
+            })();
+        }, 1500);
     }, [ready, trees, customTasks]);
+
+    const syncSignIn: BonsaiContextValue['syncSignIn'] = useCallback(
+        async (email, password) => {
+            const error = await syncAuthSignIn(email, password);
+            if (!error) void pullFromCloud();
+
+            return error;
+        },
+        [pullFromCloud]
+    );
+
+    const syncSignOut: BonsaiContextValue['syncSignOut'] = useCallback(async () => {
+        await syncAuthSignOut();
+        setSyncStatus(syncConfigured ? 'signedOut' : 'off');
+    }, []);
 
     const addTree: BonsaiContextValue['addTree'] = useCallback((tree) => {
         const created: Tree = { ...tree, id: uid(), progress: [], photo: internPhoto(tree.photo) };
@@ -556,7 +629,10 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         deleteCustomTask,
         completeTask,
         tasks,
-        agenda
+        agenda,
+        syncStatus,
+        syncSignIn,
+        syncSignOut
     };
 
     return <BonsaiContext.Provider value={value}>{children}</BonsaiContext.Provider>;

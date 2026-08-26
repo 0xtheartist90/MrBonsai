@@ -34,6 +34,20 @@ npm run lint
 
 Use `build:local` when the dev server is running — it writes to a separate directory so it never clobbers the dev server's `.next` cache. Deployment platforms run the standard `build`, which must stay on `.next`.
 
+## Sync (Supabase)
+
+Optional — without configuration the app runs local-only (localStorage + IndexedDB in one browser). With it, the collection and photos sync across devices; last write wins.
+
+One-time setup:
+
+1. Create a project at [supabase.com](https://supabase.com) (free tier).
+2. SQL Editor → paste and run [`supabase/setup.sql`](supabase/setup.sql) — creates the state table, private photo bucket and row-level security.
+3. Authentication → Users → **Add user**: your own email + a password (email confirm not needed for a personal account).
+4. Project Settings → API: copy the **Project URL** and **anon public** key into:
+   - `.env.local` (see `.env.example`) for local development
+   - Vercel → Project Settings → Environment Variables, then redeploy
+5. Open the app → Grow → cloud icon → sign in once per device.
+
 ## Collection reference
 
 `public/bonsai_plant_care_collection_corrected_aug_2026.md` is the source care document for the collection, with verified taxonomy (*Ficus annulata*, *Ehretia microphylla*, *Feroniella lucida*, *Trifidacanthus unifoliolatus*). The species data in `src/lib/bonsai/species.ts` is derived from it.

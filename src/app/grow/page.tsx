@@ -20,6 +20,8 @@ import {
     Camera,
     ChevronLeft,
     ChevronRight,
+    Cloud,
+    CloudOff,
     Droplets,
     Leaf,
     Scissors,
@@ -36,7 +38,7 @@ const FILTERS: { kind: TaskKind; label: string; icon: typeof Droplets }[] = [
 ];
 
 const GrowPage = () => {
-    const { ready, trees, tasks, agenda, completeTask } = useBonsai();
+    const { ready, trees, tasks, agenda, completeTask, syncStatus } = useBonsai();
     const [filter, setFilter] = useState<TaskKind | null>(null);
     const [featured, setFeatured] = useState(0);
     const season = currentSeason();
@@ -72,9 +74,22 @@ const GrowPage = () => {
                     <p className='text-muted-foreground text-sm'>{SEASON_LABEL[season]} · it&apos;s plant care time</p>
                     <h1 className='text-3xl font-bold tracking-tight'>Grow</h1>
                 </div>
-                <span className='shadow-primary/20 flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg'>
-                    <img src='/images/logo-mark.png' alt='Mr. Bonsai logo' className='size-10' />
-                </span>
+                <div className='flex items-center gap-2'>
+                    <Link
+                        href='/sync'
+                        aria-label='Sync settings'
+                        className={cn(
+                            'bg-card flex size-10 items-center justify-center rounded-full shadow-sm',
+                            syncStatus === 'synced' && 'text-primary',
+                            syncStatus === 'error' && 'text-destructive',
+                            (syncStatus === 'off' || syncStatus === 'signedOut') && 'text-muted-foreground'
+                        )}>
+                        {syncStatus === 'off' ? <CloudOff className='size-4.5' /> : <Cloud className='size-4.5' />}
+                    </Link>
+                    <span className='shadow-primary/20 flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg'>
+                        <img src='/images/logo-mark.png' alt='Mr. Bonsai logo' className='size-10' />
+                    </span>
+                </div>
             </header>
 
             <div className='grid grid-cols-4 gap-2'>
