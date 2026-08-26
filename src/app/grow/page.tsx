@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import Link from 'next/link';
 
+import { LoadingScreen } from '@/components/bonsai/loading-screen';
 import { TaskRow } from '@/components/bonsai/task-row';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween } from '@/lib/bonsai/season';
@@ -43,7 +44,7 @@ const GrowPage = () => {
     const [featured, setFeatured] = useState(0);
     const season = currentSeason();
 
-    if (!ready) return null;
+    if (!ready) return <LoadingScreen />;
 
     const now = new Date();
     // the Feed tile covers both fertilizer products (16-16-16 and micronutrients)
@@ -280,10 +281,10 @@ const GrowPage = () => {
 
 const seasonTip = (season: ReturnType<typeof currentSeason>): string =>
     ({
-        spring: 'Repotting season! Most species are best repotted right as their buds start to swell.',
-        summer: 'Hot days ahead — check soil moisture daily and shade sensitive species from afternoon sun.',
-        autumn: 'Growth slows down. Reduce feeding, do your wiring, and photograph the autumn colours.',
-        winter: 'Most trees rest now. Water sparingly and plan next year’s styling.'
+        spring: 'Hot season: small pots can dry in hours — check every morning, shade the pots themselves, and repot now while growth is explosive.',
+        summer: 'Rainy season: check drainage instead of watering on schedule, keep the air moving against fungus, and shelter jade and junipers from days of rain.',
+        autumn: 'Late rains: vigorous growth — keep trimming, wire flexible branches and check wire often, it bites fast now.',
+        winter: 'Cool season: the closest thing to rest. Give temperate species the coolest spot you have and use the calm for styling decisions.'
     })[season];
 
 export default GrowPage;

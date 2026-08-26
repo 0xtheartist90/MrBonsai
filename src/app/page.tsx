@@ -1,29 +1,51 @@
 'use client';
 
+import { useState } from 'react';
+
 import Link from 'next/link';
 
+import { LoadingScreen } from '@/components/bonsai/loading-screen';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { useBonsai } from '@/lib/bonsai/store';
 import { treeUrgency } from '@/lib/bonsai/urgency';
 import { cn } from '@/lib/utils';
 
+type Filter = 'all' | 'trees' | 'cuttings' | 'attention';
+
+const FILTERS: { key: Filter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'trees', label: 'Trees' },
+    { key: 'cuttings', label: 'Cuttings' },
+    { key: 'attention', label: 'Needs care' }
+];
+
 /**
  * Two rows of cards fill the screen exactly, on any device height.
  * Subtracted: page padding + header + grid offset + the floating nav's zone.
  */
-const CARD_HEIGHT = 'h-[calc((100dvh-11.25rem)/2-0.375rem)]';
+const CARD_HEIGHT = 'h-[calc((100dvh-13.75rem)/2-0.375rem)]';
 
 const MyTreesPage = () => {
     const { ready, trees, tasks } = useBonsai();
+    const [filter, setFilter] = useState<Filter>('all');
 
-    if (!ready) return null;
+    if (!ready) return <LoadingScreen />;
 
     // oldest first; trees without a known start year go last
-    const sorted = [...trees].sort(
-        (a, b) =>
-            (a.birthYear ?? Number.MAX_SAFE_INTEGER) - (b.birthYear ?? Number.MAX_SAFE_INTEGER) ||
-            new Date(a.acquiredAt).getTime() - new Date(b.acquiredAt).getTime()
-    );
+    const sorted = [...trees]
+        .sort(
+            (a, b) =>
+                (a.birthYear ?? Number.MAX_SAFE_INTEGER) - (b.birthYear ?? Number.MAX_SAFE_INTEGER) ||
+                new Date(a.acquiredAt).getTime() - new Date(b.acquiredAt).getTime()
+        )
+        .filter((tree) => {
+            if (filter === 'trees') return tree.stage !== 'cutting';
+            if (filter === 'cuttings') return tree.stage === 'cutting';
+            if (filter === 'attention')
+                return treeUrgency(tasks, tree.id) !== null || (tree.health !== undefined && tree.health !== 'healthy');
+
+            return true;
+        });
 
     return (
         <div className='space-y-4'>
@@ -41,11 +63,34 @@ const MyTreesPage = () => {
                 </span>
             </header>
 
+            <div className='flex gap-1.5'>
+                {FILTERS.map(({ key, label }) => (
+                    <button
+                        key={key}
+                        onClick={() => setFilter(key)}
+                        className={cn(
+                            'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
+                            filter === key ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-card text-foreground shadow-sm'
+                        )}>
+                        {label}
+                    </button>
+                ))}
+            </div>
+
             {sorted.length === 0 ? (
                 <div className='bg-card rounded-3xl p-6 text-center shadow-sm'>
-                    <p className='font-medium'>No trees yet</p>
+                    <p className='font-medium'>{trees.length === 0 ? 'No trees yet' : 'Nothing here'}</p>
                     <p className='text-muted-foreground mt-1 text-sm'>
-                        Tap the <span className='text-primary font-semibold'>+</span> button to add your first bonsai.
+                        {trees.length === 0 ? (
+                            <>
+                                Tap the <span className='text-primary font-semibold'>+</span> button to add your first
+                                bonsai.
+                            </>
+                        ) : filter === 'attention' ? (
+                            'Every plant is cared for right now 🌿'
+                        ) : (
+                            'Nothing matches this filter.'
+                        )}
                     </p>
                 </div>
             ) : (
@@ -77,11 +122,22 @@ const MyTreesPage = () => {
                                             {urgency.label}
                                         </span>
                                     )}
-                                    {tree.stage === 'cutting' && (
-                                        <span className='ml-auto shrink-0 rounded-full bg-white/85 px-2 py-1 text-[10px] font-semibold backdrop-blur-md'>
-                                            Cutting
-                                        </span>
-                                    )}
+                                    <span className='ml-auto flex shrink-0 gap-1'>
+                                        {tree.health && tree.health !== 'healthy' && (
+                                            <span
+                                                className={cn(
+                                                    'rounded-full px-2 py-1 text-[10px] font-semibold text-white capitalize backdrop-blur-md',
+                                                    tree.health === 'sick' ? 'bg-destructive/90' : 'bg-amber-600/90'
+                                                )}>
+                                                {tree.health}
+                                            </span>
+                                        )}
+                                        {tree.stage === 'cutting' && (
+                                            <span className='rounded-full bg-white/85 px-2 py-1 text-[10px] font-semibold backdrop-blur-md'>
+                                                Cutting
+                                            </span>
+                                        )}
+                                    </span>
                                 </div>
 
                                 <div className='absolute inset-x-3 bottom-3 text-white'>

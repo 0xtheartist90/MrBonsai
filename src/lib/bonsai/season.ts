@@ -1,19 +1,25 @@
 import type { Season } from './types';
 
+/**
+ * The internal season keys keep their names (species data is keyed on them),
+ * but boundaries and labels follow the Thai year:
+ *   spring → hot season (Mar–May) · summer → rainy season (Jun–Aug)
+ *   autumn → late rains (Sep–Oct) · winter → cool season (Nov–Feb)
+ */
 export const currentSeason = (date = new Date()): Season => {
     const m = date.getMonth() + 1;
     if (m >= 3 && m <= 5) return 'spring';
     if (m >= 6 && m <= 8) return 'summer';
-    if (m >= 9 && m <= 11) return 'autumn';
+    if (m >= 9 && m <= 10) return 'autumn';
 
     return 'winter';
 };
 
 export const SEASON_LABEL: Record<Season, string> = {
-    spring: 'Spring',
-    summer: 'Summer',
-    autumn: 'Autumn',
-    winter: 'Winter'
+    spring: 'Hot season',
+    summer: 'Rainy season',
+    autumn: 'Late rains',
+    winter: 'Cool season'
 };
 
 export const daysBetween = (a: Date, b: Date): number =>

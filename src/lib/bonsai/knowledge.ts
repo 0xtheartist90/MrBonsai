@@ -64,14 +64,14 @@ export const ARTICLES: Article[] = [
     },
     {
         id: 'seasonal-rhythm',
-        title: 'The bonsai year: working with the seasons',
+        title: 'The bonsai year in Thailand: hot, rainy, cool',
         level: 'advanced',
         minutes: 5,
         body: [
-            'Spring: repot, start feeding, protect new growth from late frost. The busiest season.',
-            'Summer: water vigilantly, pinch and trim constantly, give indoor species an outdoor holiday.',
-            'Autumn: wire while branches are flexible, reduce feeding, enjoy and photograph the colours.',
-            'Winter: rest for the tree, planning for you. Protect outdoor trees from hard frost and study your trees’ bare structure for next year’s decisions.'
+            'Hot season (March-May): the busiest and riskiest months. Small pots can dry in hours — check every morning, shade sensitive species and the pots themselves from afternoon heat, and repot at the start of this window while growth is explosive.',
+            'Rainy season (June-October): nature waters for you, which is the trap. Check drainage and saturation instead of watering on schedule, maximize airflow against fungus, and shelter rot-sensitive plants (Dwarf Jade, junipers) from days of nonstop rain.',
+            'Late rains (September-October): vigorous growth — keep the trimming rhythm going, wire while branches are flexible, and check wired branches often because they thicken fast.',
+            'Cool season (November-February): the closest thing to rest here. Temperate species (maple, fringe tree, junipers) need this pause — give them the coolest spot you have, reduce water and feeding, and use the calmer months for structural decisions and styling.'
         ]
     }
 ];

@@ -354,6 +354,12 @@ interface BonsaiContextValue {
     deleteProgress: (treeId: string, entryId: string) => void;
     addCustomTask: (task: Omit<CustomTask, 'id' | 'done'>) => void;
     deleteCustomTask: (id: string) => void;
+    /** Undo for a completed custom task */
+    reopenCustomTask: (id: string) => void;
+    /** "Checked, still moist": pushes the water check to tomorrow without logging a watering */
+    snoozeWaterCheck: (treeId: string) => void;
+    /** Undo for a deleted progress entry */
+    insertProgress: (treeId: string, entry: ProgressEntry) => void;
     completeTask: (task: CareTask) => void;
     /** Every task, one per tree — used on a tree's own page */
     tasks: CareTask[];
@@ -637,20 +643,11 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const deleteProgress: BonsaiContextValue['deleteProgress'] = useCallback((treeId, entryId) => {
+        // the stored photo is deliberately kept: it makes Undo possible, and orphans are cheap
         setTrees((t) =>
-            t.map((tree) => {
-                if (tree.id !== treeId) return tree;
-                const entry = tree.progress.find((p) => p.id === entryId);
-                // only remove the stored photo when no other entry or the cover still uses it
-                if (isPhotoRef(entry?.photo)) {
-                    const usedElsewhere =
-                        tree.photo === entry.photo ||
-                        tree.progress.some((p) => p.id !== entryId && p.photo === entry.photo);
-                    if (!usedElsewhere) removePhoto(entry.photo);
-                }
-
-                return { ...tree, progress: tree.progress.filter((p) => p.id !== entryId) };
-            })
+            t.map((tree) =>
+                tree.id === treeId ? { ...tree, progress: tree.progress.filter((p) => p.id !== entryId) } : tree
+            )
         );
     }, []);
 
@@ -660,6 +657,29 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
 
     const deleteCustomTask: BonsaiContextValue['deleteCustomTask'] = useCallback((id) => {
         setCustomTasks((c) => c.filter((task) => task.id !== id));
+    }, []);
+
+    const reopenCustomTask: BonsaiContextValue['reopenCustomTask'] = useCallback((id) => {
+        setCustomTasks((c) => c.map((task) => (task.id === id ? { ...task, done: false } : task)));
+    }, []);
+
+    const snoozeWaterCheck: BonsaiContextValue['snoozeWaterCheck'] = useCallback((treeId) => {
+        setTrees((t) =>
+            t.map((tree) => {
+                if (tree.id !== treeId) return tree;
+                const species = speciesById(tree.speciesId);
+                if (!species) return tree;
+                const interval = tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[currentSeason()];
+                // due = lastWatered + interval, so aim lastWatered such that due lands tomorrow
+                const lastWatered = addDays(startOfDay(new Date()), 1 - interval).toISOString();
+
+                return { ...tree, lastWatered };
+            })
+        );
+    }, []);
+
+    const insertProgress: BonsaiContextValue['insertProgress'] = useCallback((treeId, entry) => {
+        setTrees((t) => t.map((tree) => (tree.id === treeId ? { ...tree, progress: [entry, ...tree.progress] } : tree)));
     }, []);
 
     const tasks = useMemo(() => computeTasks(trees, customTasks), [trees, customTasks]);
@@ -693,6 +713,9 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         deleteProgress,
         addCustomTask,
         deleteCustomTask,
+        reopenCustomTask,
+        snoozeWaterCheck,
+        insertProgress,
         completeTask,
         tasks,
         agenda,
@@ -730,13 +753,15 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
             key: `water-${tree.id}`,
             kind: 'water',
             treeId: tree.id,
-            title: `Water ${tree.name}`,
+            title: `Check soil · ${tree.name}`,
             detail: species.care.watering,
             due: addDays(startOfDay(lastWatered), waterInterval)
         });
 
-        // Cuttings: no feeding or repotting until rooted — only watering and photo reminders
+        // Cuttings: no feeding or repotting until rooted — only watering and photo reminders.
+        // A stressed or sick plant also gets no fertilizer: resolve the stress before feeding.
         const isCutting = tree.stage === 'cutting';
+        const noFeeding = isCutting || (tree.health !== undefined && tree.health !== 'healthy');
 
         // Fertilizer pauses after root work (see public/fertilizer_schedule_app_logic.md):
         // NPK light 7-14d / moderate 14-21d / heavy 21-28d; micronutrients 14/18/21d
@@ -751,7 +776,7 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
         // The exact interval belongs to the product label; override it per tree in Details.
         const speciesFeed = species.care.fertilizingIntervalDays[season];
         const feedInterval = tree.careOverrides?.fertilizingDays ?? (speciesFeed === null ? null : NPK_TOPUP_DAYS);
-        if (feedInterval !== null && !isCutting) {
+        if (feedInterval !== null && !noFeeding) {
             // never fertilized: count from acquisition — a fresh (often just-repotted) plant should not be fed on day one
             const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : new Date(tree.acquiredAt);
             tasks.push({
@@ -765,7 +790,7 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
         }
 
         // Nic-Spray EDTA micronutrients: every 4-6 weeks on established plants, never on cuttings
-        if (!isCutting) {
+        if (!noFeeding) {
             // never applied: due from today, not retroactively overdue since acquisition
             const lastMicro = tree.lastMicronutrients
                 ? new Date(tree.lastMicronutrients)
@@ -780,10 +805,10 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
             });
         }
 
-        // Repotting: due in the next spring window after the interval elapses
+        // Repotting: due at the start of the hot season (warm active growth) once the interval elapses
         const lastRepotted = tree.lastRepotted ? new Date(tree.lastRepotted) : new Date(tree.acquiredAt);
         const repotYear = lastRepotted.getFullYear() + (tree.careOverrides?.repotYears ?? species.care.repotEveryYears);
-        const repotDue = new Date(repotYear, 2, 15);
+        const repotDue = new Date(repotYear, 2, 1);
         if (!isCutting && repotDue.getTime() - now.getTime() < 60 * 86_400_000) {
             tasks.push({
                 key: `repot-${tree.id}`,

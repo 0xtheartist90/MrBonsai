@@ -4,10 +4,10 @@ import Link from 'next/link';
 
 import { daysBetween, relativeDue } from '@/lib/bonsai/season';
 import { useBonsai } from '@/lib/bonsai/store';
-import type { CareTask, TaskKind } from '@/lib/bonsai/types';
+import type { CareTask, TaskKind, Tree } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
-import { Cable, Camera, Check, Droplets, FlaskConical, Leaf, ListChecks, Shovel, X } from 'lucide-react';
+import { Cable, Camera, Check, CloudRain, Droplets, FlaskConical, Leaf, ListChecks, Shovel, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const kindIcon: Record<TaskKind, typeof Droplets> = {
@@ -20,13 +20,46 @@ const kindIcon: Record<TaskKind, typeof Droplets> = {
     custom: ListChecks
 };
 
+/** The care date a task writes on completion — captured before, restored on Undo */
+const undoPatch = (task: CareTask, tree?: Tree): Partial<Tree> | null => {
+    if (!tree) return null;
+    switch (task.kind) {
+        case 'water':
+            return { lastWatered: tree.lastWatered };
+        case 'fertilize':
+            return { lastFertilized: tree.lastFertilized };
+        case 'micro':
+            return { lastMicronutrients: tree.lastMicronutrients };
+        case 'repot':
+            return { lastRepotted: tree.lastRepotted };
+        case 'wirecheck':
+            return { wireCheckedAt: tree.wireCheckedAt };
+        default:
+            return null;
+    }
+};
+
 export const TaskRow = ({ task }: { task: CareTask }) => {
-    const { completeTask, deleteCustomTask, trees } = useBonsai();
+    const { completeTask, addCustomTask, deleteCustomTask, reopenCustomTask, snoozeWaterCheck, updateTree, trees, customTasks } =
+        useBonsai();
     const Icon = kindIcon[task.kind];
     const overdue = daysBetween(new Date(), task.due) < 0;
     const tree = trees.find((t) => t.id === task.treeId);
 
-    const row = (
+    const complete = () => {
+        const patch = undoPatch(task, tree);
+        completeTask(task);
+        toast.success(task.kind === 'water' ? `${tree?.name ?? 'Plant'} watered.` : `${task.title} — done!`, {
+            action:
+                patch && task.treeId
+                    ? { label: 'Undo', onClick: () => updateTree(task.treeId!, patch) }
+                    : task.customId
+                      ? { label: 'Undo', onClick: () => reopenCustomTask(task.customId!) }
+                      : undefined
+        });
+    };
+
+    return (
         <div className='bg-card flex items-center gap-3 rounded-3xl p-3 shadow-sm'>
             <span
                 className={cn(
@@ -50,25 +83,48 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
                 </Link>
             ) : (
                 <div className='flex shrink-0 gap-1.5'>
+                    {task.kind === 'water' && task.treeId && (
+                        <button
+                            aria-label={`${tree?.name ?? 'Plant'} is still moist — check again tomorrow`}
+                            title='Still moist — check again tomorrow'
+                            onClick={() => {
+                                const prev = tree?.lastWatered;
+                                snoozeWaterCheck(task.treeId!);
+                                toast(`Still moist — ${tree?.name ?? 'plant'} checks again tomorrow.`, {
+                                    action: prev
+                                        ? { label: 'Undo', onClick: () => updateTree(task.treeId!, { lastWatered: prev }) }
+                                        : undefined
+                                });
+                            }}
+                            className='border-border text-muted-foreground hover:text-primary flex size-9 items-center justify-center rounded-full border transition-colors'>
+                            <CloudRain className='size-4' />
+                        </button>
+                    )}
                     {task.customId && (
                         <button
                             aria-label={`Delete ${task.title}`}
                             onClick={() => {
-                                if (confirm(`Delete the task "${task.title}"?`)) {
-                                    deleteCustomTask(task.customId!);
-                                    toast.success('Task deleted.');
-                                }
+                                const removed = customTasks.find((c) => c.id === task.customId);
+                                deleteCustomTask(task.customId!);
+                                toast.success('Task deleted.', {
+                                    action: removed
+                                        ? {
+                                              label: 'Undo',
+                                              onClick: () =>
+                                                  addCustomTask({ title: removed.title, due: removed.due, treeId: removed.treeId })
+                                          }
+                                        : undefined
+                                });
                             }}
                             className='border-border text-muted-foreground hover:text-destructive flex size-9 items-center justify-center rounded-full border transition-colors'>
                             <X className='size-4' />
                         </button>
                     )}
                     <button
-                        aria-label={`Mark ${task.title} as done`}
-                        onClick={() => {
-                            completeTask(task);
-                            toast.success(`${task.title} — done!`);
-                        }}
+                        aria-label={
+                            task.kind === 'water' ? `Mark ${tree?.name ?? 'plant'} as watered` : `Mark ${task.title} as done`
+                        }
+                        onClick={complete}
                         className='border-border text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary flex size-9 items-center justify-center rounded-full border transition-colors'>
                         <Check className='size-4' />
                     </button>
@@ -76,6 +132,4 @@ export const TaskRow = ({ task }: { task: CareTask }) => {
             )}
         </div>
     );
-
-    return row;
 };

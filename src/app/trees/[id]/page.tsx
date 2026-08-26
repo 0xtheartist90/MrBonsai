@@ -5,6 +5,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { LoadingScreen } from '@/components/bonsai/loading-screen';
 import { PhotoInput } from '@/components/bonsai/photo-input';
 import { TaskRow } from '@/components/bonsai/task-row';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
@@ -40,7 +41,8 @@ import {
     Sun,
     Thermometer,
     TreeDeciduous,
-    Trash2
+    Trash2,
+    X
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -71,8 +73,18 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const { id } = use(params);
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { ready, trees, tasks, addProgress, updateProgress, deleteProgress, deleteTree, updateTree, replaceCover } =
-        useBonsai();
+    const {
+        ready,
+        trees,
+        tasks,
+        addProgress,
+        updateProgress,
+        deleteProgress,
+        insertProgress,
+        deleteTree,
+        updateTree,
+        replaceCover
+    } = useBonsai();
 
     const [progressNote, setProgressNote] = useState('');
     const [progressPhoto, setProgressPhoto] = useState<string>();
@@ -84,8 +96,10 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const [tab, setTab] = useState(searchParams.get('progress') === '1' ? 'progress' : 'care');
     const [statEditor, setStatEditor] = useState<'age' | 'wired' | 'potted' | 'pruned' | null>(null);
     const [statValue, setStatValue] = useState('');
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
-    if (!ready) return null;
+    if (!ready) return <LoadingScreen />;
 
     const tree = trees.find((t) => t.id === id);
     if (!tree) {
@@ -211,27 +225,37 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                 <button
                     onClick={() => router.back()}
                     aria-label='Back'
-                    className='absolute top-4 left-4 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
+                    className='absolute top-4 left-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
                     <ArrowLeft className='size-5' />
                 </button>
                 <button
-                    onClick={() => {
-                        if (confirm(`Remove ${tree.name} from your collection? This cannot be undone.`)) {
-                            deleteTree(tree.id);
-                            toast.success(`${tree.name} removed.`);
-                            router.push('/');
-                        }
-                    }}
+                    onClick={() => setConfirmingDelete(true)}
                     aria-label='Delete tree'
-                    className='text-destructive absolute top-4 right-4 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
+                    className='text-destructive absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-md'>
                     <Trash2 className='size-4' />
                 </button>
-                <div className='absolute inset-x-4 bottom-4 text-white'>
-                    {tree.stage && (
-                        <span className='mb-1.5 inline-block rounded-full bg-white/25 px-2.5 py-0.5 text-[11px] font-semibold capitalize backdrop-blur-sm'>
-                            {tree.stage}
-                        </span>
-                    )}
+                <button
+                    onClick={() => tree.photo && setLightboxPhoto(tree.photo)}
+                    aria-label='View photo full screen'
+                    className='absolute inset-0'
+                />
+                <div className='pointer-events-none absolute inset-x-4 bottom-4 text-white'>
+                    <span className='flex gap-1.5'>
+                        {tree.stage && (
+                            <span className='mb-1.5 inline-block rounded-full bg-white/25 px-2.5 py-0.5 text-[11px] font-semibold capitalize backdrop-blur-sm'>
+                                {tree.stage}
+                            </span>
+                        )}
+                        {tree.health && tree.health !== 'healthy' && (
+                            <span
+                                className={cn(
+                                    'mb-1.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize text-white backdrop-blur-sm',
+                                    tree.health === 'sick' ? 'bg-destructive/80' : 'bg-amber-600/80'
+                                )}>
+                                {tree.health} · feeding paused
+                            </span>
+                        )}
+                    </span>
                     <h1 className='text-3xl font-bold tracking-tight drop-shadow-sm'>{tree.name}</h1>
                     <p className='text-sm text-white/85'>
                         {species.name} · <span className='italic'>{species.latin}</span>
@@ -292,6 +316,49 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                     onClick={() => openStatEditor('pruned')}
                 />
             </div>
+
+            {lightboxPhoto && (
+                <button
+                    onClick={() => setLightboxPhoto(null)}
+                    aria-label='Close photo'
+                    className='fixed inset-0 z-50 flex items-center justify-center bg-black/95'>
+                    <div className='max-h-full w-full'>
+                        <TreePhoto photo={lightboxPhoto} name={tree.name} className='max-h-dvh object-contain' />
+                    </div>
+                    <span className='absolute top-4 right-4 flex size-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur'>
+                        <X className='size-5' />
+                    </span>
+                </button>
+            )}
+
+            <Drawer open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+                <DrawerContent>
+                    <DrawerHeader className='text-left'>
+                        <DrawerTitle>Remove {tree.name}?</DrawerTitle>
+                        <DrawerDescription>
+                            This deletes the tree, its timeline and its photos from your collection. It cannot be
+                            undone.
+                        </DrawerDescription>
+                    </DrawerHeader>
+                    <div className='flex gap-2 px-4 pb-8'>
+                        <Button
+                            variant='secondary'
+                            onClick={() => setConfirmingDelete(false)}
+                            className='h-12 flex-1 rounded-full'>
+                            Keep it
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                deleteTree(tree.id);
+                                toast.success(`${tree.name} removed.`);
+                                router.push('/');
+                            }}
+                            className='bg-destructive hover:bg-destructive/90 h-12 flex-1 rounded-full text-white'>
+                            Remove
+                        </Button>
+                    </div>
+                </DrawerContent>
+            </Drawer>
 
             <Drawer open={statEditor !== null} onOpenChange={(open) => !open && setStatEditor(null)}>
                 <DrawerContent>
@@ -522,12 +589,17 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                         </div>
                     ) : (
                         <ol className='space-y-3'>
-                            {tree.progress.map((entry) => (
+                            {[...tree.progress]
+                                .sort((a, b) => b.date.localeCompare(a.date))
+                                .map((entry) => (
                                 <li key={entry.id} className='bg-card overflow-hidden rounded-3xl shadow-sm'>
                                     {entry.photo && (
-                                        <div className='h-48'>
+                                        <button
+                                            onClick={() => setLightboxPhoto(entry.photo!)}
+                                            aria-label='View photo full screen'
+                                            className='block h-48 w-full'>
                                             <TreePhoto photo={entry.photo} name={tree.name} />
-                                        </div>
+                                        </button>
                                     )}
                                     <div className='p-4'>
                                         <div className='flex items-center gap-2'>
@@ -554,10 +626,14 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                                 <button
                                                     aria-label='Delete entry'
                                                     onClick={() => {
-                                                        if (confirm('Delete this progress entry?')) {
-                                                            deleteProgress(tree.id, entry.id);
-                                                            toast.success('Entry deleted.');
-                                                        }
+                                                        const removed = { ...entry };
+                                                        deleteProgress(tree.id, entry.id);
+                                                        toast.success('Entry deleted.', {
+                                                            action: {
+                                                                label: 'Undo',
+                                                                onClick: () => insertProgress(tree.id, removed)
+                                                            }
+                                                        });
                                                     }}
                                                     className='bg-destructive/10 text-destructive flex size-7 items-center justify-center rounded-full'>
                                                     <Trash2 className='size-3' />
@@ -719,6 +795,40 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                 <option value='development'>Development (trunk & roots)</option>
                                 <option value='refinement'>Refinement (branches & crown)</option>
                             </select>
+                        </Field>
+                        <Field label='Health'>
+                            <div className='flex gap-1.5'>
+                                {(
+                                    [
+                                        ['healthy', 'Healthy'],
+                                        ['stressed', 'Stressed'],
+                                        ['sick', 'Sick']
+                                    ] as ['healthy' | 'stressed' | 'sick', string][]
+                                ).map(([value, label]) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => {
+                                            updateTree(tree.id, { health: value });
+                                            toast.success(
+                                                value === 'healthy'
+                                                    ? 'Marked healthy — feeding resumes on schedule.'
+                                                    : `Marked ${value} — fertilizer is paused until it recovers.`
+                                            );
+                                        }}
+                                        className={cn(
+                                            'flex-1 rounded-full px-3 py-2 text-xs font-medium transition-colors',
+                                            (tree.health ?? 'healthy') === value
+                                                ? value === 'healthy'
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : value === 'stressed'
+                                                      ? 'bg-amber-600 text-white'
+                                                      : 'bg-destructive text-white'
+                                                : 'bg-secondary/60 text-foreground'
+                                        )}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
                         </Field>
                         <Field label='Bought at'>
                             <Input

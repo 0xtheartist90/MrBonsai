@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { LoadingScreen } from '@/components/bonsai/loading-screen';
 import { TaskRow } from '@/components/bonsai/task-row';
 import { daysBetween } from '@/lib/bonsai/season';
 import { useBonsai } from '@/lib/bonsai/store';
@@ -18,7 +19,7 @@ const TasksPage = () => {
     const [due, setDue] = useState('');
     const [treeId, setTreeId] = useState('');
 
-    if (!ready) return null;
+    if (!ready) return <LoadingScreen />;
 
     const now = new Date();
     const overdue = tasks.filter((t) => daysBetween(now, t.due) < 0);

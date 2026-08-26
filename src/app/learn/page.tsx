@@ -14,11 +14,24 @@ import {
 
 import { ChevronRight, Clock, GraduationCap, Play, Sprout } from 'lucide-react';
 
+// Temperate-only species without a place in this tropical collection — hidden, not deleted,
+// so an existing tree that references one keeps working
+const HIDDEN_SPECIES = new Set([
+    'ficus-retusa',
+    'chinese-elm',
+    'juniper',
+    'azalea',
+    'black-pine',
+    'serissa',
+    'olive',
+    'zelkova'
+]);
+
 const LearnPage = () => {
     const { trees } = useBonsai();
     const mySpeciesIds = new Set(trees.map((t) => t.speciesId));
     const mySpecies = SPECIES.filter((s) => mySpeciesIds.has(s.id));
-    const otherSpecies = SPECIES.filter((s) => !mySpeciesIds.has(s.id));
+    const otherSpecies = SPECIES.filter((s) => !mySpeciesIds.has(s.id) && !HIDDEN_SPECIES.has(s.id));
 
     return (
         <div className='space-y-6'>

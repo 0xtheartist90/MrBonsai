@@ -127,81 +127,81 @@ export const SPECIES: Species[] = [
         evergreen: false,
         flowers: false,
         description:
-            'Beloved for its delicate leaves and spectacular autumn colours. A deciduous outdoor species that rewards careful ramification work.',
+            'Beloved for its delicate hand-shaped leaves. A temperate deciduous species and the climate watchlist plant of the collection: in tropical lowland heat it misses its winter rest, so leaf scorch and gradual decline are the risks to manage.',
         care: {
-            watering: 'Water daily in summer; keep moist but well-drained.',
-            wateringIntervalDays: { spring: 2, summer: 1, autumn: 3, winter: 6 },
-            fertilizing: 'Feed every two weeks after the first leaves harden.',
-            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 14, winter: null },
-            repotting: 'Repot every two years in early spring before bud break.',
-            repotEveryYears: 2,
-            pruning: 'Prune to two pairs of leaves; do major cuts in autumn to avoid bleeding.',
-            sunlight: 'Morning sun, afternoon shade — leaves burn in hot sun.',
-            temperature: 'Hardy, but protect from late spring frosts and drying wind'
+            watering: 'Keep the small rootball moist — it can bake dry in hours of Thai heat. Check daily, water before it wilts.',
+            wateringIntervalDays: { spring: 1, summer: 1, autumn: 1, winter: 2 },
+            fertilizing: 'Moderate balanced feeding while it grows actively; nothing during a weak or leafless spell.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 21, winter: null },
+            repotting: 'Every 1-2 years at bud swell in the coolest part of the year.',
+            repotEveryYears: 1,
+            pruning: 'Prune to two pairs of leaves; thin bark scars easily, so sharp clean tools and gentle wire.',
+            sunlight: 'Morning sun only — afternoon tropical sun burns the leaves. Keep the pot itself cool and shaded.',
+            temperature: 'Temperate: the cool season is its only rest here — the cooler its spot, the better'
         },
         seasonalTips: {
-            spring: 'Protect fresh leaves from frost; pinch shoots early.',
-            summer: 'Shade from afternoon sun to prevent leaf scorch.',
-            autumn: 'Best colour of the year — take your seasonal photo!',
-            winter: 'Structural pruning while the branches are bare.'
+            spring: 'Hot season: highest scorch risk of the year — morning sun only, daily water, shade the pot.',
+            summer: 'Rainy season: airflow against fungus; do not mistake heat-stress leaf drop for dormancy.',
+            autumn: 'Late rains: if it held its leaves, let it build reserves — light feeding.',
+            winter: 'Cool season: give it the coolest spot you have; structural pruning if it drops leaves.'
         }
     },
     {
         id: 'jade',
         name: 'Dwarf Jade',
         latin: 'Portulacaria afra',
-        placement: 'indoor',
+        placement: 'outdoor',
         difficulty: 'beginner',
         leafType: 'succulent',
         evergreen: true,
         flowers: false,
         description:
-            'A succulent that is almost impossible to kill by underwatering. Great for busy owners and warm, bright windowsills.',
+            'A succulent that is almost impossible to kill by underwatering — and easy to kill by overwatering. The driest plant of the collection; in the tropics the rainy season is its enemy, not the cold.',
         care: {
-            watering: 'Let the soil dry out completely between waterings.',
-            wateringIntervalDays: { spring: 7, summer: 5, autumn: 10, winter: 21 },
-            fertilizing: 'Feed monthly during the growing season.',
-            fertilizingIntervalDays: { spring: 30, summer: 30, autumn: null, winter: null },
-            repotting: 'Repot every two years in spring in very well-draining soil.',
+            watering: 'Let the soil dry out almost completely between waterings, then soak and drain. Overwatering is far more dangerous than slightly too dry.',
+            wateringIntervalDays: { spring: 5, summer: 7, autumn: 7, winter: 6 },
+            fertilizing: 'Light feeder — use at least 50% less slow-release than the label indicates for normal plants.',
+            fertilizingIntervalDays: { spring: 30, summer: 30, autumn: 30, winter: 30 },
+            repotting: 'Every two years in very free-draining soil, during warm active growth.',
             repotEveryYears: 2,
-            pruning: 'Prune year-round; cuts heal without sealing.',
-            sunlight: 'As much direct sun as possible.',
-            temperature: 'Above 5°C at all times; loves summer outdoors'
+            pruning: 'Clip-and-grow year-round; cuts heal without sealing. Wire bites fast — clip-and-grow is safer.',
+            sunlight: 'As much direct sun as possible; full sun keeps growth compact.',
+            temperature: 'Loves tropical heat; shelter from days of nonstop rain'
         },
         seasonalTips: {
-            spring: 'Repot and increase watering as days lengthen.',
-            summer: 'Move outside to full sun for compact growth.',
-            autumn: 'Bring inside before the first cold nights.',
-            winter: 'Water very sparingly — once every few weeks is enough.'
+            spring: 'Hot season: its favourite weather — full sun, water only when fully dry.',
+            summer: 'Rainy season is the danger: shelter from long rain, never let the pot stay soggy.',
+            autumn: 'Late rains: keep sheltering; check the trunk base for soft spots.',
+            winter: 'Cool season: grows on happily — water when dry, enjoy the compact growth.'
         }
     },
     {
         id: 'carmona',
         name: 'Fukien Tea',
         latin: 'Ehretia microphylla (syn. Carmona retusa)',
-        placement: 'indoor',
+        placement: 'outdoor',
         difficulty: 'intermediate',
         leafType: 'broadleaf',
         evergreen: true,
         flowers: true,
         description:
-            'A tropical indoor species with small white flowers and glossy dark leaves. Sensitive to cold and inconsistent watering.',
+            'A tropical species with small white flowers and glossy dark leaves — outdoors year-round in this climate, where it flowers repeatedly. Sensitive to inconsistent watering; leaf drop is a signal to check the soil, not automatically a reason to water.',
         care: {
-            watering: 'Keep slightly moist at all times; never soggy, never bone dry.',
-            wateringIntervalDays: { spring: 3, summer: 2, autumn: 3, winter: 4 },
-            fertilizing: 'Feed every two weeks in the growing season with mild fertilizer.',
-            fertilizingIntervalDays: { spring: 14, summer: 14, autumn: 30, winter: null },
-            repotting: 'Repot every two years in spring; handle the fine roots gently.',
+            watering: 'Keep slightly moist at all times; water when the surface begins drying. Never soggy, never bone dry — small pots can need daily checks in hot weather.',
+            wateringIntervalDays: { spring: 2, summer: 2, autumn: 2, winter: 3 },
+            fertilizing: 'Regular mild feeding; organic pellets are gentle on the fine roots.',
+            fertilizingIntervalDays: { spring: 14, summer: 14, autumn: 14, winter: 21 },
+            repotting: 'Every 2-3 years in warm active growth; handle the fine roots gently, no heavy root work on a weakened plant.',
             repotEveryYears: 2,
-            pruning: 'Trim regularly; flowers appear on new shoots.',
-            sunlight: 'Very bright spot, ideally with morning sun.',
-            temperature: 'Constant 18°C to 25°C; avoid drafts'
+            pruning: 'Clip-and-grow; flowers appear on new shoots, so trim after a flowering flush.',
+            sunlight: 'Very bright with morning sun; light protection in the fiercest afternoon heat.',
+            temperature: 'Thrives in tropical warmth outdoors'
         },
         seasonalTips: {
-            spring: 'Flowering starts — feed gently and keep humidity up.',
-            summer: 'Can go outside in a sheltered warm spot.',
-            autumn: 'Back indoors early; it dislikes cold nights.',
-            winter: 'Keep warm and bright; mist to raise humidity.'
+            spring: 'Hot season: daily soil checks — drying out triggers leaf drop.',
+            summer: 'Rainy season: good airflow against fungus; skip watering after soaking rain.',
+            autumn: 'Late rains: strong growth — keep trimming after each flower flush.',
+            winter: 'Cool season: still flowering; slightly less water.'
         }
     },
     {
