@@ -10,7 +10,7 @@ import { TaskRow } from '@/components/bonsai/task-row';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween, formatDate, relativeDue } from '@/lib/bonsai/season';
 import { SPECIES, speciesById } from '@/lib/bonsai/species';
-import { useBonsai } from '@/lib/bonsai/store';
+import { NPK_TOPUP_DAYS, useBonsai } from '@/lib/bonsai/store';
 import type { ProgressKind, RepotSeverity } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/registry/new-york-v4/ui/button';
@@ -95,7 +95,10 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const age = tree.birthYear ? new Date().getFullYear() - tree.birthYear : undefined;
 
     const waterInterval = tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[season];
-    const feedInterval = tree.careOverrides?.fertilizingDays ?? species.care.fertilizingIntervalDays[season];
+    // 16-16-16 is slow-release: ~90-day top-up cycle (label wins), not the species' liquid rhythm
+    const feedInterval =
+        tree.careOverrides?.fertilizingDays ??
+        (species.care.fertilizingIntervalDays[season] === null ? null : NPK_TOPUP_DAYS);
     const waterTask = treeTasks.find((t) => t.kind === 'water');
     const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
     const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
@@ -615,15 +618,15 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                                     className='bg-secondary/60 h-11 rounded-2xl border-none'
                                 />
                             </Field>
-                            <Field label='Fertilize every (days)'>
+                            <Field label='16-16-16 top-up (days)'>
                                 <Input
                                     type='number'
                                     min={1}
                                     defaultValue={tree.careOverrides?.fertilizingDays}
                                     placeholder={
                                         species.care.fertilizingIntervalDays[season] === null
-                                            ? 'Species: paused'
-                                            : `Species: ${species.care.fertilizingIntervalDays[season]}`
+                                            ? 'Paused this season'
+                                            : `Label cycle: ~${NPK_TOPUP_DAYS}`
                                     }
                                     onBlur={(e) =>
                                         updateTree(tree.id, {
@@ -681,15 +684,14 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                             days
                             {tree.stage === 'cutting' ? (
                                 <> · feeding paused while rooting</>
+                            ) : feedInterval === null ? (
+                                <> · 16-16-16 paused this season</>
                             ) : (
                                 <>
                                     {' '}
-                                    · feeding every{' '}
-                                    <span className='text-foreground font-semibold'>
-                                        {(tree.careOverrides?.fertilizingDays ??
-                                            species.care.fertilizingIntervalDays[season]) ?? '— (paused)'}
-                                    </span>{' '}
-                                    days
+                                    · 16-16-16 top-up every{' '}
+                                    <span className='text-foreground font-semibold'>{feedInterval}</span> days ·
+                                    micronutrients every <span className='text-foreground font-semibold'>35</span> days
                                 </>
                             )}
                             .

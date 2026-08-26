@@ -21,6 +21,9 @@ const DATA_REV = 3;
 /** 26 Aug 2026: the user watered the entire collection by hand */
 const WATERED_ALL_AT = '2026-08-26T10:00:00.000Z';
 
+/** Slow-release NPK top-up cycle (typical ~3 months); the product label wins via careOverrides */
+export const NPK_TOPUP_DAYS = 90;
+
 const uid = (): string => Math.random().toString(36).slice(2, 10);
 
 /**
@@ -536,7 +539,11 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
         const lastRepot = tree.lastRepotted ? startOfDay(new Date(tree.lastRepotted)) : null;
         const later = (a: Date, b: Date | null): Date => (b && b > a ? b : a);
 
-        const feedInterval = tree.careOverrides?.fertilizingDays ?? species.care.fertilizingIntervalDays[season];
+        // Multitech 16-16-16 is SLOW-RELEASE: granules feed for ~3 months, so the task is a
+        // top-up on that cycle — not the species' liquid-feed rhythm, which would overfeed.
+        // The exact interval belongs to the product label; override it per tree in Details.
+        const speciesFeed = species.care.fertilizingIntervalDays[season];
+        const feedInterval = tree.careOverrides?.fertilizingDays ?? (speciesFeed === null ? null : NPK_TOPUP_DAYS);
         if (feedInterval !== null && !isCutting) {
             // never fertilized: count from acquisition — a fresh (often just-repotted) plant should not be fed on day one
             const lastFed = tree.lastFertilized ? new Date(tree.lastFertilized) : new Date(tree.acquiredAt);
@@ -544,8 +551,8 @@ const computeTasks = (trees: Tree[], customTasks: CustomTask[]): CareTask[] => {
                 key: `fertilize-${tree.id}`,
                 kind: 'fertilize',
                 treeId: tree.id,
-                title: `Feed ${tree.name} · 16-16-16`,
-                detail: 'Multitech slow-release, label dosage. Only feed a healthy, actively growing tree.',
+                title: `Top up 16-16-16 · ${tree.name}`,
+                detail: 'Slow-release, label dosage — skip if granules are still visible. Only on a healthy, actively growing tree.',
                 due: later(addDays(startOfDay(lastFed), feedInterval), lastRepot && addDays(lastRepot, npkPauseDays))
             });
         }
