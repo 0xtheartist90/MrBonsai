@@ -36,3 +36,4 @@ vercel.env
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+mr-bonsai-export.json

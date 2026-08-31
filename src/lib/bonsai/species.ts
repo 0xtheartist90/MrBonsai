@@ -647,6 +647,35 @@ SPECIES.push(
         }
     },
     {
+        id: 'loropetalum',
+        name: 'Chinese Fringe Flower',
+        latin: 'Loropetalum chinense',
+        placement: 'outdoor',
+        difficulty: 'beginner',
+        leafType: 'broadleaf',
+        evergreen: true,
+        flowers: true,
+        description:
+            'Evergreen witch-hazel relative with purple-bronze foliage and pink ribbon-like fringe flowers — the exact plant the knowledge pack warned not to confuse with Chionanthus retusus. Far better suited to warm climates than the true Fringe Tree: no winter dormancy required.',
+        care: {
+            watering: 'Keep evenly moist but never soggy: water when the top 1-2 cm begins to dry, then soak and drain.',
+            wateringIntervalDays: { spring: 1, summer: 2, autumn: 2, winter: 2 },
+            fertilizing: 'Balanced feed during active growth; it colours and flowers best with steady, moderate nutrition.',
+            fertilizingIntervalDays: { spring: 14, summer: 21, autumn: 21, winter: 30 },
+            repotting: 'Every 1-2 years while young, in warm active growth; it prefers acidic, well-draining soil.',
+            repotEveryYears: 2,
+            pruning: 'Clip-and-grow right after a flowering flush — it blooms on shoot tips, so hard pruning before bloom removes the show.',
+            sunlight: 'Full sun to light shade; the purple foliage colours deepest with several hours of direct sun.',
+            temperature: 'Warm-climate tolerant; acidic soil (like Ixora) keeps the foliage rich'
+        },
+        seasonalTips: {
+            spring: 'Hot season: main flowering flush — water checks daily, prune after the show.',
+            summer: 'Rainy season: good drainage and airflow; foliage may green up with less sun.',
+            autumn: 'Late rains: steady growth — keep trimming for density.',
+            winter: 'Cool season: often a second flowering flush; enjoy the contrast of purple leaf and pink bloom.'
+        }
+    },
+    {
         id: 'sweet-orange',
         name: 'Sweet Orange',
         latin: 'Citrus × sinensis (L.) Osbeck',
