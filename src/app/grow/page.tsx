@@ -10,7 +10,15 @@ import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween } from '@/lib/bonsai/season';
 import { speciesById } from '@/lib/bonsai/species';
 import { useBonsai } from '@/lib/bonsai/store';
+import { waterGuideline } from '@/lib/bonsai/tasks';
 import { stylingFocus, treeUrgency } from '@/lib/bonsai/urgency';
+import {
+    Drawer,
+    DrawerContent,
+    DrawerDescription,
+    DrawerHeader,
+    DrawerTitle
+} from '@/registry/new-york-v4/ui/drawer';
 import type { TaskKind } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 
@@ -39,7 +47,8 @@ const FILTERS: { kind: TaskKind; label: string; icon: typeof Droplets }[] = [
 ];
 
 const GrowPage = () => {
-    const { ready, trees, tasks, agenda, completeTask, syncStatus } = useBonsai();
+    const { ready, trees, tasks, agenda, completeTask, logWatering, updateTree, syncStatus } = useBonsai();
+    const [waterSheetOpen, setWaterSheetOpen] = useState(false);
     const [filter, setFilter] = useState<TaskKind | null>(null);
     const [featured, setFeatured] = useState(0);
     const season = currentSeason();
@@ -53,7 +62,11 @@ const GrowPage = () => {
 
     const dueTasks = agenda.filter((t) => daysBetween(now, t.due) <= 0);
     const shown = filter ? dueTasks.filter((t) => matchesFilter(filter, t)) : dueTasks;
-    const dueWater = dueTasks.filter((t) => t.kind === 'water');
+    // watering is a log-button flow, not a task — this sorts the bench by thirst
+    const wateringRows = trees
+        .map((tree) => ({ tree, ...waterGuideline(tree, now) }))
+        .sort((a, b) => (b.daysSince ?? 999) - (a.daysSince ?? 999));
+    const pastGuideline = wateringRows.filter((r) => r.daysSince === null || r.daysSince >= r.intervalDays).length;
 
     const needsAttention = trees
         .map((tree) => ({ tree, urgency: treeUrgency(tasks, tree.id, now) }))
@@ -95,13 +108,13 @@ const GrowPage = () => {
 
             <div className='grid grid-cols-4 gap-2'>
                 {FILTERS.map(({ kind, label, icon: Icon }) => {
-                    const count = dueTasks.filter((t) => matchesFilter(kind, t)).length;
+                    const count = kind === 'water' ? pastGuideline : dueTasks.filter((t) => matchesFilter(kind, t)).length;
                     const active = filter === kind;
 
                     return (
                         <button
                             key={kind}
-                            onClick={() => setFilter(active ? null : kind)}
+                            onClick={() => (kind === 'water' ? setWaterSheetOpen(true) : setFilter(active ? null : kind))}
                             className={cn(
                                 'relative flex flex-col items-center gap-1.5 rounded-2xl py-3 text-[11px] font-semibold shadow-sm transition-colors',
                                 active ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'
@@ -227,23 +240,9 @@ const GrowPage = () => {
             <section>
                 <div className='mb-2 flex items-center justify-between'>
                     <h2 className='font-semibold'>{filter ? `${FILTERS.find((f) => f.kind === filter)?.label} tasks` : 'Today’s care'}</h2>
-                    <div className='flex items-center gap-3'>
-                        {dueWater.length > 0 && (
-                            <button
-                                onClick={() => {
-                                    dueWater.forEach(completeTask);
-                                    toast.success(
-                                        `${dueWater.length} ${dueWater.length === 1 ? 'plant' : 'plants'} marked as watered — the rest stay on their own rhythm.`
-                                    );
-                                }}
-                                className='bg-accent text-accent-foreground flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold'>
-                                <Droplets className='size-3.5' /> Watered the {dueWater.length} due
-                            </button>
-                        )}
-                        <Link href='/tasks' className='text-primary flex items-center text-sm font-medium'>
-                            All tasks <ChevronRight className='size-4' />
-                        </Link>
-                    </div>
+                    <Link href='/tasks' className='text-primary flex items-center text-sm font-medium'>
+                        All tasks <ChevronRight className='size-4' />
+                    </Link>
                 </div>
                 {shown.length === 0 ? (
                     <div className='bg-card rounded-3xl p-5 text-center shadow-sm'>
@@ -275,6 +274,64 @@ const GrowPage = () => {
                     </Link>
                 </p>
             </section>
+
+            <Drawer open={waterSheetOpen} onOpenChange={setWaterSheetOpen}>
+                <DrawerContent>
+                    <DrawerHeader className='text-left'>
+                        <DrawerTitle>Watering round</DrawerTitle>
+                        <DrawerDescription>
+                            Tap the drop for every plant you watered. Days shown are since the last logged watering;
+                            the guide is the species rhythm, your finger in the soil decides.
+                        </DrawerDescription>
+                    </DrawerHeader>
+                    <div className='max-h-[55dvh] space-y-1.5 overflow-y-auto px-4 pb-8'>
+                        {wateringRows.map(({ tree, daysSince, intervalDays }) => {
+                            const thirsty = daysSince === null || daysSince >= intervalDays;
+
+                            return (
+                                <div key={tree.id} className='bg-secondary/50 flex items-center gap-3 rounded-2xl p-2.5'>
+                                    <div className='size-10 shrink-0 overflow-hidden rounded-xl'>
+                                        <TreePhoto photo={tree.photo} name={tree.name} />
+                                    </div>
+                                    <div className='min-w-0 flex-1'>
+                                        <p className='truncate text-sm font-semibold'>{tree.name}</p>
+                                        <p
+                                            className={cn(
+                                                'text-xs',
+                                                thirsty ? 'text-destructive font-medium' : 'text-muted-foreground'
+                                            )}>
+                                            {daysSince === null
+                                                ? 'Never logged'
+                                                : daysSince === 0
+                                                  ? 'Watered today'
+                                                  : `${daysSince}d ago`}{' '}
+                                            · guide ~{intervalDays}d
+                                        </p>
+                                    </div>
+                                    <button
+                                        aria-label={`Log watering for ${tree.name}`}
+                                        onClick={() => {
+                                            const prev = { lastWatered: tree.lastWatered, careLog: tree.careLog };
+                                            logWatering(tree.id);
+                                            toast.success(`${tree.name} watered.`, {
+                                                action: { label: 'Undo', onClick: () => updateTree(tree.id, prev) }
+                                            });
+                                        }}
+                                        disabled={daysSince === 0}
+                                        className={cn(
+                                            'flex size-10 shrink-0 items-center justify-center rounded-full transition-colors',
+                                            daysSince === 0
+                                                ? 'bg-accent/60 text-accent-foreground/50'
+                                                : 'bg-accent text-accent-foreground hover:bg-primary hover:text-primary-foreground'
+                                        )}>
+                                        <Droplets className='size-4' />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </DrawerContent>
+            </Drawer>
         </div>
     );
 };

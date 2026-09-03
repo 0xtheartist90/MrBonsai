@@ -79,17 +79,29 @@ const touch = (tree: Tree): Tree => ({ ...tree, modifiedAt: new Date().toISOStri
  */
 const mergeTrees = (local: Tree[], remote: Tree[], deleted: Set<string>): Tree[] => {
     const byId = new Map<string, Tree>();
+    const remoteIds = new Set(remote.map((t) => t.id));
     for (const tree of remote) byId.set(tree.id, tree);
     for (const tree of local) {
         const other = byId.get(tree.id);
-        if (!other || (tree.modifiedAt ?? '') >= (other.modifiedAt ?? '')) byId.set(tree.id, tree);
+        // ties go to the cloud copy: a stale device must never displace it
+        if (!other || (tree.modifiedAt ?? '') > (other.modifiedAt ?? '')) byId.set(tree.id, tree);
     }
     // devices that seeded independently can hold the same tree under different ids
     const byName = new Map<string, Tree>();
     for (const tree of byId.values()) {
         if (deleted.has(tree.id)) continue;
-        const twin = byName.get(`${tree.name}|${tree.speciesId}`);
-        if (!twin || (tree.modifiedAt ?? '') >= (twin.modifiedAt ?? '')) byName.set(`${tree.name}|${tree.speciesId}`, tree);
+        const key = `${tree.name}|${tree.speciesId}`;
+        const twin = byName.get(key);
+        if (!twin) {
+            byName.set(key, tree);
+            continue;
+        }
+        const treeStamp = tree.modifiedAt ?? '';
+        const twinStamp = twin.modifiedAt ?? '';
+        // strictly newer wins; on a tie prefer whichever copy the cloud knows
+        if (treeStamp > twinStamp || (treeStamp === twinStamp && remoteIds.has(tree.id) && !remoteIds.has(twin.id))) {
+            byName.set(key, tree);
+        }
     }
 
     return [...byName.values()];
@@ -399,6 +411,8 @@ interface BonsaiContextValue {
     reopenCustomTask: (id: string) => void;
     /** "Checked, still moist": pushes the water check to tomorrow without logging a watering */
     snoozeWaterCheck: (treeId: string) => void;
+    /** The watering button: stamps lastWatered now and appends to the care log */
+    logWatering: (treeId: string) => void;
     /** Undo for a deleted progress entry */
     insertProgress: (treeId: string, entry: ProgressEntry) => void;
     completeTask: (task: CareTask) => void;
@@ -521,13 +535,14 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
                 setTrees(state.trees);
                 setCustomTasks(state.customTasks);
                 setDeletedTreeIds(deletedRef.current);
-            } else {
+            } else if (!syncConfigured) {
                 const seeded = seedTrees();
                 treesRef.current = seeded;
                 setTrees(seeded);
             }
+            // sync-configured fresh browser: start empty and let sign-in pull the real collection
         } catch {
-            setTrees(seedTrees());
+            if (!syncConfigured) setTrees(seedTrees());
         }
         setReady(true);
         void pullFromCloud();
@@ -754,6 +769,21 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         );
     }, []);
 
+    const logWatering: BonsaiContextValue['logWatering'] = useCallback((treeId) => {
+        const nowIso = new Date().toISOString();
+        setTrees((t) =>
+            t.map((tree) =>
+                tree.id === treeId
+                    ? touch({
+                          ...tree,
+                          lastWatered: nowIso,
+                          careLog: [{ date: nowIso, kind: 'water' as const }, ...(tree.careLog ?? [])].slice(0, 200)
+                      })
+                    : tree
+            )
+        );
+    }, []);
+
     const insertProgress: BonsaiContextValue['insertProgress'] = useCallback((treeId, entry) => {
         setTrees((t) => t.map((tree) => (tree.id === treeId ? touch({ ...tree, progress: [entry, ...tree.progress] }) : tree)));
     }, []);
@@ -807,6 +837,7 @@ export const BonsaiProvider = ({ children }: { children: ReactNode }) => {
         deleteCustomTask,
         reopenCustomTask,
         snoozeWaterCheck,
+        logWatering,
         insertProgress,
         completeTask,
         tasks,

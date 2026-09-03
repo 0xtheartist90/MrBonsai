@@ -2,6 +2,17 @@ import { SEASON_LABEL, addDays, currentSeason, startOfDay } from './season';
 import { speciesById } from './species';
 import type { CareTask, CustomTask, Tree } from './types';
 
+/** The species watering rhythm for this season — a guideline for the log button, not a task */
+export const waterGuideline = (tree: Tree, now = new Date()): { intervalDays: number; daysSince: number | null } => {
+    const species = speciesById(tree.speciesId);
+    const intervalDays = tree.careOverrides?.wateringDays ?? species?.care.wateringIntervalDays[currentSeason(now)] ?? 2;
+    const daysSince = tree.lastWatered
+        ? Math.round((startOfDay(now).getTime() - startOfDay(new Date(tree.lastWatered)).getTime()) / 86_400_000)
+        : null;
+
+    return { intervalDays, daysSince };
+};
+
 /** Multitech 16-16-16 label: 4-month supply — 3-4 g per 5" pot, 6-8 g per 10" pot */
 export const NPK_TOPUP_DAYS = 120;
 
@@ -19,17 +30,8 @@ export const computeTasks = (trees: Tree[], customTasks: CustomTask[], now = new
         const species = speciesById(tree.speciesId);
         if (!species) continue;
 
-        // A tree's own schedule wins over the species default for the season
-        const waterInterval = tree.careOverrides?.wateringDays ?? species.care.wateringIntervalDays[season];
-        const lastWatered = tree.lastWatered ? new Date(tree.lastWatered) : addDays(now, -waterInterval);
-        tasks.push({
-            key: `water-${tree.id}`,
-            kind: 'water',
-            treeId: tree.id,
-            title: `Check soil · ${tree.name}`,
-            detail: species.care.watering,
-            due: addDays(startOfDay(lastWatered), waterInterval)
-        });
+        // Watering is deliberately NOT a task: the user checks the bench daily and logs
+        // waterings with a button. The species interval lives on as a soft guideline only.
 
         // Cuttings: no feeding or repotting until rooted — only watering and photo reminders.
         // A stressed or sick plant also gets no fertilizer: resolve the stress before feeding.

@@ -12,6 +12,7 @@ import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween, formatDate, relativeDue } from '@/lib/bonsai/season';
 import { SPECIES, speciesById } from '@/lib/bonsai/species';
 import { NPK_TOPUP_DAYS, useBonsai } from '@/lib/bonsai/store';
+import { waterGuideline } from '@/lib/bonsai/tasks';
 import type { ProgressKind, RepotSeverity } from '@/lib/bonsai/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/registry/new-york-v4/ui/button';
@@ -98,7 +99,8 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
         insertProgress,
         deleteTree,
         updateTree,
-        replaceCover
+        replaceCover,
+        logWatering
     } = useBonsai();
 
     const [progressNote, setProgressNote] = useState('');
@@ -143,9 +145,8 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
     const feedInterval =
         tree.careOverrides?.fertilizingDays ??
         (species.care.fertilizingIntervalDays[season] === null ? null : NPK_TOPUP_DAYS);
-    const waterTask = treeTasks.find((t) => t.kind === 'water');
     const feedTask = treeTasks.find((t) => t.kind === 'fertilize');
-    const waterDueDays = waterTask ? daysBetween(new Date(), waterTask.due) : null;
+    const { intervalDays: waterGuideDays, daysSince: daysSinceWater } = waterGuideline(tree);
     const entriesOfKind = (kind: ProgressKind) =>
         [...tree.progress].filter((p) => p.kinds?.includes(kind)).sort((a, b) => b.date.localeCompare(a.date));
 
@@ -316,10 +317,22 @@ const TreePage = ({ params }: { params: Promise<{ id: string }> }) => {
                 <ScheduleCard
                     icon={Droplets}
                     label='Water'
-                    rhythm={waterInterval === 1 ? 'Daily' : `Every ${waterInterval}d`}
-                    status={waterTask ? relativeDue(waterTask.due) : '—'}
-                    urgent={waterDueDays !== null && waterDueDays <= 0}
-                    onClick={() => setTab('care')}
+                    rhythm={
+                        daysSinceWater === null
+                            ? 'Not logged yet'
+                            : daysSinceWater === 0
+                              ? 'Today'
+                              : `${daysSinceWater}d ago`
+                    }
+                    status={`Tap when watered · guide ~${waterGuideDays}d`}
+                    urgent={daysSinceWater !== null && daysSinceWater >= waterGuideDays}
+                    onClick={() => {
+                        const prev = { lastWatered: tree.lastWatered, careLog: tree.careLog };
+                        logWatering(tree.id);
+                        toast.success(`${tree.name} watered.`, {
+                            action: { label: 'Undo', onClick: () => updateTree(tree.id, prev) }
+                        });
+                    }}
                 />
             </div>
 

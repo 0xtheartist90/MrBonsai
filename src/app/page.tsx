@@ -26,7 +26,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 const CARD_HEIGHT = 'h-[calc((100dvh-13.75rem)/2-0.375rem)]';
 
 const MyTreesPage = () => {
-    const { ready, trees, tasks } = useBonsai();
+    const { ready, trees, tasks, syncStatus } = useBonsai();
     const [filter, setFilter] = useState<Filter>('all');
 
     if (!ready) return <LoadingScreen />;
@@ -83,7 +83,15 @@ const MyTreesPage = () => {
                 <div className='bg-card rounded-3xl p-6 text-center shadow-sm'>
                     <p className='font-medium'>{trees.length === 0 ? 'No trees yet' : 'Nothing here'}</p>
                     <p className='text-muted-foreground mt-1 text-sm'>
-                        {trees.length === 0 ? (
+                        {trees.length === 0 && syncStatus === 'signedOut' ? (
+                            <>
+                                Your collection lives in the cloud —{' '}
+                                <Link href='/sync' className='text-primary font-semibold underline underline-offset-2'>
+                                    sign in on the Sync page
+                                </Link>{' '}
+                                to load it, or tap <span className='text-primary font-semibold'>+</span> to start fresh.
+                            </>
+                        ) : trees.length === 0 ? (
                             <>
                                 Tap the <span className='text-primary font-semibold'>+</span> button to add your first
                                 bonsai.
