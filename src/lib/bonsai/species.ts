@@ -676,6 +676,64 @@ SPECIES.push(
         }
     },
     {
+        id: 'lemon-cypress',
+        name: 'Lemon Cypress (Son Hom)',
+        latin: "Cupressus macrocarpa 'Goldcrest'",
+        placement: 'outdoor',
+        difficulty: 'intermediate',
+        leafType: 'scale',
+        evergreen: true,
+        flowers: false,
+        description:
+            'Thai สนหอม — a lemon-scented golden conifer sold as a mosquito repeller (the scent is real, the repelling mostly marketing). A cool-coast native that manages in the tropics with airflow and restraint on water; soggy soil is what kills it.',
+        care: {
+            watering: 'Let the top layer clearly begin drying before watering, then soak and drain fully. Never leave it constantly wet — root rot is its number one killer.',
+            wateringIntervalDays: { spring: 2, summer: 3, autumn: 3, winter: 3 },
+            fertilizing: 'Light, regular feeding during active growth; overfeeding coarsens the fine foliage.',
+            fertilizingIntervalDays: { spring: 30, summer: 30, autumn: 30, winter: 30 },
+            repotting: 'Every 2-3 years in very free-draining mix; disturb the roots as little as possible.',
+            repotEveryYears: 2,
+            pruning: 'Pinch and scissor-trim green shoots only — never cut into bare wood, it does not back-bud there. Keep some green on every branch.',
+            sunlight: 'Full sun to very bright; the golden colour fades in shade.',
+            temperature: 'Cool-coast species: airflow and cool nights help; shelter from pounding rain'
+        },
+        seasonalTips: {
+            spring: 'Hot season: shade the pot itself and check moisture daily — but only water once the top dries.',
+            summer: 'Rainy season is the danger: maximum drainage, shelter from days of rain, watch for browning tips.',
+            autumn: 'Late rains: keep the air moving; trim lightly to keep the cone dense.',
+            winter: 'Cool season: its best months here — full sun and steady light trimming.'
+        }
+    },
+    {
+        id: 'khasi-pine',
+        name: 'Khasi Pine (Son Sam Bai)',
+        latin: 'Pinus kesiya',
+        placement: 'outdoor',
+        difficulty: 'advanced',
+        leafType: 'needle',
+        evergreen: true,
+        flowers: false,
+        description:
+            'Thai สนสามใบ, the three-needle pine that grows wild on the mountains around Chiang Mai — a native conifer, so the climate fits better than any imported pine. Classic bonsai material with real pine bark and candle growth, but slow: a long-term project from seedling.',
+        care: {
+            watering: 'On the dry side: let the surface dry between waterings, then water thoroughly. Pines prefer slightly dry over wet, and mountain natives insist on drainage.',
+            wateringIntervalDays: { spring: 2, summer: 3, autumn: 3, winter: 3 },
+            fertilizing: 'Feed steadily through active growth to build the seedling; keep mycorrhiza happy with organic fertilizer.',
+            fertilizingIntervalDays: { spring: 21, summer: 30, autumn: 21, winter: 30 },
+            repotting: 'Every 2-3 years, keeping part of the old root ball and its mycorrhiza intact — never bare-root a pine.',
+            repotEveryYears: 2,
+            pruning: 'Seedling years: let it run and thicken. Later: shorten candles in the hot season and pull old needles; never leave a branch needle-less.',
+            sunlight: 'Full sun all day — it grows on exposed mountain slopes.',
+            temperature: 'Native to Thai highlands; loves sun, tolerates the lowlands with airflow'
+        },
+        seasonalTips: {
+            spring: 'Hot season: candle growth — the moment to shorten candles on developed trees; seedlings just grow.',
+            summer: 'Rainy season: perfect drainage and full sun between showers; watch for fungus on needles.',
+            autumn: 'Late rains: wire young flexible shoots; growth slows toward the cool season.',
+            winter: 'Cool season: its mountain weather — full sun, light water, plan next year.'
+        }
+    },
+    {
         id: 'sweet-orange',
         name: 'Sweet Orange',
         latin: 'Citrus × sinensis (L.) Osbeck',
