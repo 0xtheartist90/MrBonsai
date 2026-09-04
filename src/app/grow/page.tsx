@@ -6,6 +6,7 @@ import Link from 'next/link';
 
 import { LoadingScreen } from '@/components/bonsai/loading-screen';
 import { TaskRow } from '@/components/bonsai/task-row';
+import { Button } from '@/registry/new-york-v4/ui/button';
 import { TreePhoto } from '@/components/bonsai/tree-photo';
 import { SEASON_LABEL, currentSeason, daysBetween } from '@/lib/bonsai/season';
 import { speciesById } from '@/lib/bonsai/species';
@@ -27,6 +28,7 @@ import { toast } from 'sonner';
 import {
     Cable,
     Camera,
+    Check,
     ChevronLeft,
     ChevronRight,
     Cloud,
@@ -49,6 +51,8 @@ const FILTERS: { kind: TaskKind; label: string; icon: typeof Droplets }[] = [
 const GrowPage = () => {
     const { ready, trees, tasks, agenda, completeTask, logWatering, updateTree, syncStatus } = useBonsai();
     const [waterSheetOpen, setWaterSheetOpen] = useState(false);
+    const [waterSelecting, setWaterSelecting] = useState(false);
+    const [waterSelected, setWaterSelected] = useState<Set<string>>(new Set());
     const [filter, setFilter] = useState<TaskKind | null>(null);
     const [featured, setFeatured] = useState(0);
     const season = currentSeason();
@@ -278,10 +282,23 @@ const GrowPage = () => {
             <Drawer open={waterSheetOpen} onOpenChange={setWaterSheetOpen}>
                 <DrawerContent>
                     <DrawerHeader className='text-left'>
-                        <DrawerTitle>Watering round</DrawerTitle>
+                        <div className='flex items-center justify-between'>
+                            <DrawerTitle>Watering round</DrawerTitle>
+                            {!waterSelecting && trees.length > 1 && (
+                                <button
+                                    onClick={() => {
+                                        setWaterSelected(new Set(trees.map((t) => t.id)));
+                                        setWaterSelecting(true);
+                                    }}
+                                    className='bg-accent text-accent-foreground rounded-full px-3 py-1.5 text-xs font-semibold'>
+                                    Watered all…
+                                </button>
+                            )}
+                        </div>
                         <DrawerDescription>
-                            Tap the drop for every plant you watered. Days shown are since the last logged watering;
-                            the guide is the species rhythm, your finger in the soil decides.
+                            {waterSelecting
+                                ? 'Everything is ticked — untick the plants you skipped, then confirm.'
+                                : 'Tap the drop for every plant you watered, or use "Watered all…" and untick the exceptions.'}
                         </DrawerDescription>
                     </DrawerHeader>
                     <div className='max-h-[55dvh] space-y-1.5 overflow-y-auto px-4 pb-8'>
@@ -308,28 +325,80 @@ const GrowPage = () => {
                                             · guide ~{intervalDays}d
                                         </p>
                                     </div>
-                                    <button
-                                        aria-label={`Log watering for ${tree.name}`}
-                                        onClick={() => {
-                                            const prev = { lastWatered: tree.lastWatered, careLog: tree.careLog };
-                                            logWatering(tree.id);
-                                            toast.success(`${tree.name} watered.`, {
-                                                action: { label: 'Undo', onClick: () => updateTree(tree.id, prev) }
-                                            });
-                                        }}
-                                        disabled={daysSince === 0}
-                                        className={cn(
-                                            'flex size-10 shrink-0 items-center justify-center rounded-full transition-colors',
-                                            daysSince === 0
-                                                ? 'bg-accent/60 text-accent-foreground/50'
-                                                : 'bg-accent text-accent-foreground hover:bg-primary hover:text-primary-foreground'
-                                        )}>
-                                        <Droplets className='size-4' />
-                                    </button>
+                                    {waterSelecting ? (
+                                        <button
+                                            aria-label={`${waterSelected.has(tree.id) ? 'Skip' : 'Include'} ${tree.name}`}
+                                            onClick={() =>
+                                                setWaterSelected((sel) => {
+                                                    const next = new Set(sel);
+                                                    if (next.has(tree.id)) next.delete(tree.id);
+                                                    else next.add(tree.id);
+
+                                                    return next;
+                                                })
+                                            }
+                                            className={cn(
+                                                'flex size-10 shrink-0 items-center justify-center rounded-full transition-colors',
+                                                waterSelected.has(tree.id)
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'bg-card text-muted-foreground border-border border'
+                                            )}>
+                                            <Check className='size-4' />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            aria-label={`Log watering for ${tree.name}`}
+                                            onClick={() => {
+                                                const prev = { lastWatered: tree.lastWatered, careLog: tree.careLog };
+                                                logWatering(tree.id);
+                                                toast.success(`${tree.name} watered.`, {
+                                                    action: { label: 'Undo', onClick: () => updateTree(tree.id, prev) }
+                                                });
+                                            }}
+                                            disabled={daysSince === 0}
+                                            className={cn(
+                                                'flex size-10 shrink-0 items-center justify-center rounded-full transition-colors',
+                                                daysSince === 0
+                                                    ? 'bg-accent/60 text-accent-foreground/50'
+                                                    : 'bg-accent text-accent-foreground hover:bg-primary hover:text-primary-foreground'
+                                            )}>
+                                            <Droplets className='size-4' />
+                                        </button>
+                                    )}
                                 </div>
                             );
                         })}
                     </div>
+                    {waterSelecting && (
+                        <div className='border-border/60 flex gap-2 border-t px-4 pt-3 pb-8'>
+                            <Button
+                                variant='secondary'
+                                onClick={() => setWaterSelecting(false)}
+                                className='h-12 rounded-full'>
+                                Cancel
+                            </Button>
+                            <Button
+                                disabled={waterSelected.size === 0}
+                                onClick={() => {
+                                    const targets = trees.filter((t) => waterSelected.has(t.id));
+                                    const prevs = targets.map((t) => ({
+                                        id: t.id,
+                                        patch: { lastWatered: t.lastWatered, careLog: t.careLog }
+                                    }));
+                                    targets.forEach((t) => logWatering(t.id));
+                                    const skipped = trees.length - targets.length;
+                                    toast.success(
+                                        `${targets.length} waterings logged${skipped > 0 ? ` — ${skipped} skipped` : ''}.`,
+                                        { action: { label: 'Undo', onClick: () => prevs.forEach((p) => updateTree(p.id, p.patch)) } }
+                                    );
+                                    setWaterSelecting(false);
+                                    setWaterSheetOpen(false);
+                                }}
+                                className='h-12 flex-1 rounded-full font-semibold'>
+                                Log {waterSelected.size} waterings
+                            </Button>
+                        </div>
+                    )}
                 </DrawerContent>
             </Drawer>
         </div>
